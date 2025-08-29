@@ -1,0 +1,6 @@
+*~
+*.d
+*.o
+*.elf
+*.so
+.ninja_log
