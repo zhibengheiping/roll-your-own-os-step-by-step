@@ -22,7 +22,7 @@ signal_set_handler(int signum, void (*handler)(int, siginfo_t *, void *)) {
   sigemptyset(&sa.sa_mask);
   sa.sa_flags = SA_ONSTACK|SA_SIGINFO;
   sa.sa_sigaction = handler;
-  if (sigaction(SIGALRM, &sa, NULL) == -1) {
+  if (sigaction(signum, &sa, NULL) == -1) {
     perror("sigaction");
     exit(EXIT_FAILURE);
   }
