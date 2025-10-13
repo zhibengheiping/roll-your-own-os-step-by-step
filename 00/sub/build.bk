@@ -1,0 +1,33 @@
+assert get_g() == 1
+assert get_l() == 0
+
+assert g == 1
+assert l == 1
+assert u == 0
+
+g = 2
+l = 2
+
+assert get_g() == 2
+assert get_l() == 0
+
+assert PWD == get_pwd() == Path(__file__).parent
+
+def get_pwd():
+    return PWD
+
+def get_u():
+    return u
+
+assert h == 1
+
+try:
+    i
+    assert False
+except NameError:
+    pass
+
+from ..lib import h, i
+
+assert h == 1
+assert i == 0

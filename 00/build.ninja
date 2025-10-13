@@ -1,0 +1,6 @@
+rule cc
+  command = gcc -o $out $in
+
+sources = example.c empty.c
+
+build example.elf: cc $sources

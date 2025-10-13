@@ -1,0 +1,22 @@
+from pathlib import Path
+
+global g, h, i
+
+g = 0
+h = 0
+i = 0
+l = 0
+
+def get_g():
+    return g
+
+def get_l():
+    return l
+
+def get_pwd():
+    return PWD
+
+assert get_g() == 0
+assert get_l() == 0
+
+assert PWD == get_pwd() == Path(__file__).parent

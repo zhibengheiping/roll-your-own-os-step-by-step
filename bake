@@ -1,0 +1,721 @@
+#!/usr/bin/env python3
+
+from ast import Global, parse
+from collections import ChainMap
+from contextlib import contextmanager
+from dataclasses import dataclass
+from fcntl import LOCK_EX, LOCK_NB, flock
+from hashlib import blake2b
+from graphlib import CycleError, TopologicalSorter
+from inspect import currentframe
+from io import StringIO
+from os import O_CLOEXEC, O_CREAT, O_EXCL, O_RDONLY, O_RDWR, fdopen, open, rename
+from pathlib import Path
+from shlex import join, split
+from subprocess import run
+from sys import stderr
+from traceback import _MOVE_COST, _levenshtein_distance, print_exception
+from time import time_ns
+from types import ModuleType, TracebackType
+
+
+MODULE_EXT = ".bm"
+DIR_MODULE = "__init__" + MODULE_EXT
+BAKEFILE = 'bakefile'
+LOG_MAGIC = "# bake log v1"
+LOGFILE = '.bake_log'
+
+MODS = {}
+LOCALS = ChainMap()
+PWD = Path().absolute()
+RULES = []
+
+
+def readline(it):
+    for line in it:
+        if line.endswith("\\"):
+            yield line[:-1]
+        else:
+            yield line
+            return
+
+
+def readlines(f):
+    it = iter(f.read().splitlines())
+    while True:
+        parts = list(readline(it))
+        if not parts:
+            return
+        yield ''.join(parts)
+
+
+def parse_depfile(depfile=None):
+    if depfile is None:
+        return ()
+
+    try:
+        f = depfile.open()
+    except FileNotFoundError:
+        return ()
+
+    deps = set()
+
+    with f:
+        for line in readlines(f):
+            parts = split(line, comments=True)
+            if parts:
+                deps.update(name.replace('$$', '$') for name in parts[1:])
+
+    return tuple(PWD/name for name in deps)
+
+
+def relpath(path):
+    return path.relative_to(PWD, walk_up=True)
+
+
+def normpath(path):
+    parts = []
+    for p in path.absolute().parts:
+        if p == '..':
+            parts.pop()
+        elif p != '.':
+            parts.append(p)
+    normalized = Path(*parts)
+    return normalized if path.is_absolute() else  relpath(normalized)
+
+
+def normcmd(l):
+    return tuple((str(normpath(e)) if isinstance(e, Path) else e) for e in l)
+
+
+def traceback():
+    tb = None
+    frame = currentframe()
+    while frame:
+        code = frame.f_code
+        if code.co_filename == __file__:
+            if code.co_name == 'main':
+                break
+        else:
+            tb = TracebackType(tb, frame, frame.f_lasti, frame.f_lineno)
+        frame = frame.f_back
+    return tb
+
+
+@dataclass(frozen=True, eq=False)
+class Rule:
+    provides: tuple[str]
+    depends: tuple[str]
+    commands: tuple[tuple[str]]
+    traceback: TracebackType
+
+    def __init__(self, provides=(), depends=(), commands=(), depfile=None):
+        super().__setattr__('provides', tuple(str(normpath(p)) for p in provides))
+        super().__setattr__('depends', tuple(str(normpath(p)) for p in depends) + parse_depfile(depfile))
+        super().__setattr__('commands', tuple(normcmd(c) for c in commands))
+        super().__setattr__('traceback', traceback())
+
+    def digest(self):
+        return blake2b(repr(self.commands).encode(), digest_size=8).hexdigest()
+
+
+def add_rule(rule):
+    assert isinstance(rule, Rule)
+    RULES.append(rule)
+
+
+@contextmanager
+def shift_locals():
+    global LOCALS
+    old = LOCALS
+    LOCALS = ChainMap()
+    try:
+        yield
+    finally:
+        LOCALS = old
+
+
+@contextmanager
+def enter_scope(d):
+    LOCALS.maps.insert(0, d)
+    try:
+        yield
+    finally:
+        LOCALS.maps.pop(0)
+
+
+class RedirectScope:
+
+    def __init__(self):
+        self.test = ()
+
+    def __getitem__(self, name):
+        if name in self.test:
+            return LOCALS[name]
+        raise KeyError(name)
+
+    @contextmanager
+    def __call__(self, globals):
+        builtins = globals.pop('__builtins__')
+        self.test = globals.copy()
+        globals.clear()
+        globals['__builtins__'] = builtins
+        try:
+            with enter_scope(self.test):
+                yield
+        finally:
+            globals.update(self.test)
+            self.test = ()
+
+
+def compile_module(f):
+    mod = parse(f.read(), f.name, 'exec')
+    mod.body.insert(0, Global(names=['PWD'], lineno=1, col_offset=1))
+    return compile(mod, f.name, 'exec')
+
+
+def exec_module(code, mod):
+    filename = mod.__file__
+    path = Path(filename).parent
+
+    mod.PWD = normpath(path)
+    globals = {'PWD': mod.PWD}
+    redirect = RedirectScope()
+
+    defined = set()
+
+    def include(name):
+        with redirect(globals):
+            return include_module(path / name)
+
+    def build(f, /, **kw):
+        def wrapper(*args, **kwargs):
+            with redirect(globals):
+                with enter_scope(kw):
+                    rule = f(*args, **kwargs)
+            add_rule(rule)
+        return wrapper
+
+    def __import__(name, globals=None, locals=None, fromlist=(), level=0):
+        if level == 0:
+            return __builtins__.__import__(name, globals, locals, fromlist, level)
+        if level - 1 > len(normpath(path.absolute()).parents):
+            raise ImportError("attempted relative import beyond top-level package")
+        return import_module(normpath(path.joinpath(*("..",)*(level-1))), name)
+
+    override = {
+        'Rule': Rule,
+        'include': include,
+        'build': build,
+        '__import__': __import__}
+    builtins = ChainMap(redirect, mod.__dict__, override, __builtins__.__dict__)
+    globals['__builtins__'] = builtins
+
+    with enter_scope(mod.__dict__):
+        exec(code, globals, LOCALS)
+
+    with redirect(globals):
+        override.update(redirect.test)
+        test = frozenset(redirect.test)
+        redirect.test = {}
+
+    redirect.test = test
+
+    mod.__getattr__ = lambda name: builtins[name]
+
+    def build(f, /, **kw):
+        def wrapper(*args, **kwargs):
+            with enter_scope(kw):
+                rule = f(*args, **kwargs)
+            add_rule(rule)
+        return wrapper
+
+    override['build'] = build
+    del override['include']
+    del override['__import__']
+
+    return mod
+
+
+def include_module(path, mod_name=None):
+    filename = str(normpath(path))
+    try:
+        f = path.open("rb")
+    except FileNotFoundError:
+        raise ModuleNotFoundError(f"No bakefile named {filename!r}")
+
+    with f:
+        code = compile_module(f)
+
+    if mod_name is None:
+        mod_name = f"<{filename}>"
+    mod = ModuleType(mod_name)
+    mod.__file__ = filename
+    exec_module(code, mod)
+    return mod
+
+
+def import_module(path, name):
+    path = normpath(path.joinpath(*name.split(".")))
+    mod_name = str(path)
+    if mod_name in MODS:
+        return MODS[mod_name]
+
+    candidates = [path / DIR_MODULE]
+    if name:
+        candidates.insert(0, path.with_name(path.name + MODULE_EXT))
+
+    for path in candidates:
+        try:
+            f = path.open("rb")
+        except FileNotFoundError:
+            continue
+        else:
+            break
+    else:
+        raise ModuleNotFoundError(f"No bake module named {mod_name!r}")
+
+    with f:
+        code = compile_module(f)
+
+    mod = ModuleType(f"<{f.name}>")
+    mod.__file__ = f.name
+    MODS[mod_name] = mod
+
+    with shift_locals():
+        exec_module(code, mod)
+
+    return mod
+
+
+class Note(Exception):
+    pass
+
+
+class Error(Exception):
+    pass
+
+
+def abspath(filename):
+    return normpath(Path(filename).absolute())
+
+
+def get_providers(rules):
+    providers = {}
+    error = 0
+
+    for rule in rules:
+        for filename in rule.provides:
+            path = abspath(filename)
+            prev = providers.get(path, None)
+            if prev is None:
+                providers[path] = rule
+                continue
+
+            cause = Note(f"previous rule generates {filename!r}")
+            cause.with_traceback(prev.traceback)
+
+            exc = Error(f"multiple rule generates {filename!r}")
+            exc.with_traceback(rule.traceback)
+            exc.__cause__ = cause
+            print_exception(exc)
+            print("*" * 80, file=stderr)
+            error += 1
+
+    if error:
+        print(f"{error} error generated.", file=stderr)
+        exit(1)
+
+    return providers
+
+
+def resolve_target(target, providers):
+    is_absolute = Path(target).is_absolute()
+    file_path = abspath(target)
+    if file_path in providers:
+        return file_path
+
+    wrong_name = str(file_path)
+    wrong_name_len = len(wrong_name)
+    best_distance = len(target)
+    suggestion = None
+
+    for path in providers:
+        name = str(path)
+        max_distance = (len(name) + wrong_name_len + 3) * _MOVE_COST // 6
+        max_distance = min(max_distance, best_distance - 1)
+        current_distance = _levenshtein_distance(wrong_name, name, max_distance)
+        if current_distance > max_distance:
+            continue
+        if not suggestion or current_distance < best_distance:
+            suggestion = name if is_absolute else str(relpath(path))
+            best_distance = current_distance
+
+    message = f"target {target!r} is not defined."
+    if suggestion is not None:
+        message += f" Did you mean: {suggestion!r}?"
+    print_exception(NameError(message))
+
+
+def resolve_targets(targets, providers):
+    if not targets:
+        return set(providers)
+
+    error = 0
+    rules = set()
+
+    for target in targets:
+        rule = resolve_target(target, providers)
+        if rule is None:
+            error += 1
+        else:
+            rules.add(rule)
+
+    if error:
+        print(f"{error} error generated.", file=stderr)
+        exit(1)
+
+    return rules
+
+
+def find_filename(path, l):
+    for filename in l:
+        if path == abspath(filename):
+            return filename
+    assert False
+
+
+def sort_targets(targets, providers):
+    sorter = TopologicalSorter()
+    visited = set()
+
+    queue = list(targets)
+    while queue:
+        target = queue.pop(0)
+        if target in visited:
+            continue
+        visited.add(target)
+        if isinstance(target, Path):
+            if target not in providers:
+                continue
+            dep = providers[target]
+            sorter.add(target, dep)
+            queue.append(dep)
+        else:
+            sorter.add(target)
+            for dep in target.depends:
+                dep = abspath(dep)
+                sorter.add(target, dep)
+                queue.append(dep)
+
+    try:
+        return tuple(sorter.static_order())
+    except CycleError as e:
+        cycle = list(e.args[1])
+
+        cause = None
+
+        for i in range(len(cycle)-2, 0, -2):
+            provide = find_filename(cycle[i+1], cycle[i].provides)
+            depend = find_filename(cycle[i-1], cycle[i].depends)
+            exc = Note(f"{provide!r} depends on {depend!r}")
+            exc.with_traceback(cycle[i].traceback)
+            exc.__cause__ = cause
+            cause = exc
+
+        exc = Error("cycle detected")
+        exc.__cause__ = cause
+        print_exception(exc)
+        exit(1)
+
+
+def stat_file(filename):
+    try:
+        return Path(filename).stat().st_mtime_ns
+    except FileNotFoundError:
+        return None
+
+
+def stat_files(filenames):
+    return [(name, stat_file(name)) for name in filenames]
+
+
+class Log:
+
+    def __init__(self, entries):
+        self.files = {}
+        self.log = []
+        self.updated = set()
+
+        for start_time, digest, mtime, name in entries:
+            path = abspath(name)
+            assert path not in self.files
+            self.files[path] = start_time, digest, mtime, name
+
+    def find(self, digest, provides):
+        start_time = None
+
+        for name, mtime in provides:
+            if mtime is None:
+                return
+
+            entry = self.files.get(abspath(name), None)
+            if entry is None:
+                return
+
+            if entry[1:3] != (digest, mtime):
+                return
+
+            if start_time is not None:
+                if start_time <= entry[0]:
+                    continue
+            start_time = entry[0]
+
+        return start_time
+
+    def append(self, start_time, digest, provides):
+        for name, mtime in provides:
+            path = abspath(name)
+            self.files[path] = (start_time, digest, mtime, name)
+            self.log.append((start_time, digest, mtime, name))
+            self.updated.add(path)
+
+
+def read_log(f):
+    text = f.read()
+    if not text:
+        return
+    lines = text.splitlines()
+
+    line = lines.pop(0)
+    if line != LOG_MAGIC:
+        print_exception(Error(f"{LOGFILE} corrupted"))
+        exit(1)
+
+    for line in lines:
+        start_time, digest, mtime, name = line.split('\t', 3)
+        start_time = int(start_time, 16)
+        mtime = start_time + int(mtime)
+        yield start_time, digest, mtime, name
+
+
+def update_log(entries, updated, append):
+    for start_time, digest, mtime, name in entries:
+        if abspath(name) in updated:
+            continue
+        yield start_time, digest, mtime, name
+    yield from append
+
+
+def write_log(entries):
+    fd = open(f"{LOGFILE}.tmp", O_RDWR|O_CREAT|O_EXCL|O_CLOEXEC)
+
+    with fdopen(fd, "w") as f:
+        print(LOG_MAGIC, file=f)
+        for start_time, digest, mtime, name in entries:
+            if mtime is None:
+                continue
+            mtime = mtime - start_time
+            print(f"{start_time:x}\t{digest}\t{mtime}\t{name}", file=f)
+
+    rename(f"{LOGFILE}.tmp", LOGFILE)
+
+
+@contextmanager
+def open_log(dry_run):
+    if dry_run:
+        try:
+            fd = open(LOGFILE, O_RDONLY|O_CLOEXEC)
+        except FileNotFoundError:
+            fd = None
+    else:
+        fd = open(LOGFILE, O_RDONLY|O_CREAT|O_CLOEXEC)
+
+    if fd is None:
+        f = StringIO()
+    else:
+        try:
+            flock(fd, LOCK_EX|LOCK_NB)
+        except BlockingIOError:
+            print_exception(Error("another process is baking"))
+            exit(1)
+        f = fdopen(fd)
+
+    with f:
+        entries = list(read_log(f))
+        log = Log(entries)
+
+        try:
+            yield log
+        finally:
+            if log.updated:
+                entries = list(update_log(entries, log.updated, log.log))
+                write_log(entries)
+
+
+def check_updated(updated, start_time, depends):
+    for name in depends:
+        path = abspath(name)
+        if path in updated:
+            state = updated[path]
+            if state is not False:
+                return state
+        else:
+            mtime = stat_file(name)
+            if (mtime is None) or (mtime >= start_time):
+                return True
+    return False
+
+
+def run_commands(commands, traceback, dry_run, verbose):
+    for cmd in commands:
+        if verbose:
+            print(join(cmd), file=stderr)
+        if dry_run:
+            continue
+        try:
+            run(cmd, check=True)
+        except Exception as e:
+            print_exception(e.with_traceback(traceback))
+            return False
+    return True
+
+
+def process_rule(counter, rule, updated, log, always_build, dry_run, verbose):
+    start_time = time_ns()
+    old_mtime = stat_files(rule.provides)
+    digest = rule.digest()
+    old_start_time = log.find(digest, old_mtime)
+
+    names = ", ".join(repr(name) for name in rule.provides)
+
+    if (not always_build) and (old_start_time is not None):
+        state = check_updated(updated, old_start_time, rule.depends)
+        if not state:
+            for name in rule.depends:
+                updated[abspath(name)] = state
+
+            if verbose:
+                message = "reuse" if state is False else "dep failed"
+                print(counter, message, names, file=stderr)
+
+            return state is False
+
+    print(counter, "build", names, file=stderr)
+
+    if run_commands(rule.commands, rule.traceback, dry_run, verbose):
+        if dry_run:
+            for name in rule.provides:
+                updated[abspath(name)] = True
+        else:
+            stat = stat_files(rule.provides)
+            log.append(start_time, digest, stat)
+            for name, mtime in stat:
+                updated[abspath(name)] = None if mtime is None else True
+        return True
+    else:
+        for name in rule.provides:
+            updated[abspath(name)] = None
+        return False
+
+
+def format_counter(index, size):
+    size = f"{size}"
+    return f"[{index:{len(size)}}/{size}]"
+
+
+def remove_file(path):
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+
+
+def remove_files(names, dry_run, verbose):
+    for i, name in enumerate(names):
+        if verbose:
+            counter = format_counter(i+1, len(names))
+            print(counter, "remove", name, file=stderr)
+        if not dry_run:
+            remove_file(abspath(name))
+
+
+def cleandead(providers, dry_run, verbose):
+    if not providers:
+        return
+
+    with open_log(dry_run) as log:
+        dead = set(log.files) - set(providers)
+        remove_files([log.files[path][3] for path in dead], dry_run, verbose)
+        if not dry_run:
+            log.updated.update(dead)
+
+
+def build(rules, keep_going, always_build, dry_run, verbose):
+    limit = keep_going if keep_going else None
+
+    updated = {}
+
+    with open_log(dry_run) as log:
+        for i, rule in enumerate(rules):
+            counter = format_counter(i+1, len(rules))
+
+            if process_rule(counter, rule, updated, log, always_build, dry_run, verbose):
+                continue
+
+            if limit is None:
+                continue
+
+            limit -= 1
+            if not limit:
+                exit(1)
+
+
+def clean(rules, dry_run, verbose):
+    found = set()
+    for rule in rules:
+        for name in rule.provides:
+            path = abspath(name)
+            if not path.exists():
+                continue
+            found.add(name)
+
+    remove_files(found, dry_run, verbose)
+
+
+def main(task, bakefile, targets, keep_going, always_build, dry_run, verbose):
+    mod = include_module(Path(bakefile), mod_name='__main__')
+    providers = get_providers(RULES)
+
+    if task == 'cleandead':
+        cleandead(providers, dry_run, verbose)
+        return
+
+    targets = resolve_targets(targets, providers)
+    targets = sort_targets(targets, providers)
+    rules = tuple(rule for rule in targets if isinstance(rule, Rule))
+
+    if not rules:
+        return
+
+    if task == 'build':
+        build(rules, keep_going, always_build, dry_run, verbose)
+    elif task == 'clean':
+        clean(rules, dry_run, verbose)
+    else:
+        assert False
+
+
+if __name__ == '__main__':
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument('-B', '--always-build', action='store_true', help="Unconditionally build all targets.")
+    parser.add_argument('-f', '--file', '--bakefile', help="Read FILE as bakefile", default=BAKEFILE)
+    parser.add_argument('-k', '--keep-going', nargs='?', const=0, default=1, type=int, metavar='N', help='Keep going until N jobs failed, 0 means infinite')
+    parser.add_argument('-n', '--dry-run', '--just-print', '--recon', action='store_true', help="Don't actually run any command, just print them.")
+    parser.add_argument('-t', '--task', choices=['build', 'clean', 'cleandead'], help='task type', default='build')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Show all command lines while building')
+    parser.add_argument('target', nargs='*')
+
+    args = parser.parse_args()
+    main(args.task, args.file, args.target, args.keep_going, args.always_build, args.dry_run, args.verbose)

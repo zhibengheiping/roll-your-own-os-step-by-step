@@ -1,0 +1,33 @@
+#!../bake -f
+
+from .lib import Path, get_g, get_l, get_pwd
+
+assert get_g() == 0
+assert get_l() == 0
+
+assert PWD == get_pwd() == Path(__file__).parent
+
+g = 1
+h = 1
+l = 1
+u = 0
+
+assert get_g() == 1
+assert get_l() == 0
+
+sub = include("sub/build.bk")
+
+assert get_g() == 1
+assert get_l() == 0
+
+assert g == 1
+assert l == 1
+
+assert PWD == get_pwd() == Path(__file__).parent
+assert PWD == sub.get_pwd()
+
+try:
+    sub.get_u()
+    assert False
+except NameError:
+    pass

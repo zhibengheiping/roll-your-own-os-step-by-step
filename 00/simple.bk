@@ -1,0 +1,6 @@
+#!../bake -f
+
+def simple(output):
+    return Rule(provides=(PWD/output,))
+
+build(simple)("test.o")

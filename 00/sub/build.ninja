@@ -1,0 +1,3 @@
+rule cc
+  command = gcc -o $out $in
+build example.elf: cc example.c

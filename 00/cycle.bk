@@ -1,0 +1,9 @@
+#!../bake -f
+
+def simple(output, input):
+    return Rule(provides=(PWD/output,), depends=(PWD/input,))
+
+build(simple)("a.o", "b.o")
+build(simple)("b.o", "c.o")
+build(simple)("c.o", "a.o")
+
