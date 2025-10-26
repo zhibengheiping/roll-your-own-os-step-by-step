@@ -1,15 +1,9 @@
-#include <stdio.h>
-#include <stdint.h>
+#include <unistd.h>
+#include "osrt.h"
 
 void
-hello(void) {
-  uintptr_t a = 2;
-  printf("Hello, world!\n");
+kernel_main(void) {
+  static const char greet[] = "Hello, world!\n";
+  write(STDOUT_FILENO, greet, sizeof(greet));
 }
 
-int
-main(void) {
-  uintptr_t a = 1;
-  hello();
-  return 0;
-}

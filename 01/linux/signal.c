@@ -3,9 +3,8 @@
 #include <sys/mman.h>
 #include "signal.h"
 
-__attribute__((constructor))
 void
-signal_setup_stack(void) {
+signal_init(void) {
   stack_t ss = {0};
   void *ss_addr = mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
   ss.ss_sp = ss_addr;

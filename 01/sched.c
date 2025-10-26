@@ -1,16 +1,18 @@
 #include <stddef.h>
-#include <sys/mman.h>
-#include "task.h"
+#include "sched.h"
 
-struct task task_main;
-struct task *task_current = &task_main;
+static struct task *task_current;
 
 void
-task_init(struct task *task, void (*f)(void), size_t stack_size) {
-  void *addr = mmap(NULL, stack_size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
+sched_init(void) {
+  task_current = &task_main;
+}
+
+void
+task_init(struct task *task, void (*f)(void), void *stack_top) {
   task->jmpbuf[0] = 0;
   task->jmpbuf[1] = (uintptr_t)f;
-  task->jmpbuf[2] = (uintptr_t)addr + stack_size;
+  task->jmpbuf[2] = (uintptr_t)stack_top;
 }
 
 static

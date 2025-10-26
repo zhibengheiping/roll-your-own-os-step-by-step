@@ -2,6 +2,7 @@
 *.d
 *.o
 *.elf
+*.efi
 *.so
 .ninja_log
 .bake_log

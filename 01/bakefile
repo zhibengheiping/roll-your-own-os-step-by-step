@@ -1,0 +1,56 @@
+#!../bake -f
+
+from .. import cc, ld
+
+CFLAGS = (
+    "-g",
+    "-O0",
+    "-mgeneral-regs-only",
+    "-mno-red-zone",
+    "-fpie",
+    "-fno-sanitize=all",
+    "-fcf-protection=none",
+    "-fno-stack-protector",
+    "-fno-stack-clash-protection",
+    "-fno-builtin",
+    "-fomit-frame-pointer",
+    "-D_GNU_SOURCE")
+
+OBJS = {path.with_suffix(".o"): path for path in PWD.glob("*.c")}
+
+for obj, src in OBJS.items():
+    build(cc)(obj, src)
+
+build(cc)("stack.elf", "stack.o")
+
+TARGETS = {
+    "hello": ["hello.o"],
+    "yield": ["yield.o", "sched.o"],
+    "timer": ["timer.o"],
+    "preempt": ["preempt.o", "sched.o"]
+}
+
+linux = include("linux/build.bk")
+LDFLAGS = ("-pie",)
+for name, objs in TARGETS.items():
+    build(cc)(f"{name}.elf", *objs, *linux.OBJS)
+
+LDFLAGS = (
+    "-s",
+    "-pie",
+    "-nostdlib",
+    "-m", "i386pep",
+    "--oformat=pei-x86-64",
+    "--subsystem=10",
+    "--image-base=0x0",
+    "--enable-reloc-section",
+    "--exclude-all-symbols",
+    "--file-alignment=1")
+
+LDSCRIPT = PWD/"boot.ld"
+build(ld)("boot/EFI/Boot/BOOTX64.efi", "hello.o", "efi/boot.o", "efi/serial.o")
+
+efi = include("efi/build.bk")
+LDSCRIPT = efi.LDSCRIPT
+for name, objs in TARGETS.items():
+    build(ld)(f"{name}.efi", *objs, *efi.OBJS)

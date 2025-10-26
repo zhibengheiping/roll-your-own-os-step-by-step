@@ -602,6 +602,9 @@ def process_rule(counter, rule, updated, log, always_build, dry_run, verbose):
             return state is False
 
     print(counter, "build", names, file=stderr)
+    if not dry_run:
+        for p in rule.provides:
+            abspath(p).parent.mkdir(parents=True, exist_ok=True)
 
     if run_commands(rule.commands, rule.traceback, dry_run, verbose):
         if dry_run:

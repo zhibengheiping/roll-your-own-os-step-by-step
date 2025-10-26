@@ -1,0 +1,13 @@
+OBJS = {path.with_suffix(".o"): path for path in PWD.glob("*.c")}
+
+for obj, src in OBJS.items():
+    if src.name == 'boot.c':
+        build(cc,
+              CFLAGS = CFLAGS + (
+                  '-fshort-wchar',
+                  '-I../include'),
+              )(obj, src)
+    else:
+        build(cc)(obj, src)
+
+LDSCRIPT = PWD/"kernel.ld"

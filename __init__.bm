@@ -1,0 +1,46 @@
+global CC, CFLAGS, LD, LDFLAGS, LDSCRIPT
+CC = ('gcc',)
+CFLAGS = ()
+LD = ('ld', )
+LDFLAGS = ()
+LDSCRIPT = None
+
+def cc(output, *inputs):
+    if isinstance(output, str):
+        output = PWD / output
+    inputs = tuple(PWD/name if isinstance(name, str) else name for name in inputs)
+    depfile = None
+
+    provides = (output,)
+
+    command = CC
+    if output.suffix == '.o':
+        depfile = output.with_suffix(".d")
+        command += ("-c", "-MMD", "-MF", depfile) + CFLAGS
+        provides += (depfile,)
+    else:
+        command += LDFLAGS
+
+    command += ("-o", output) + inputs
+
+    return Rule(
+        provides = provides,
+        depends = inputs,
+        commands = [command],
+        depfile = depfile)
+
+def ld(output, *inputs):
+    if isinstance(output, str):
+        output = PWD / output
+    inputs = tuple(PWD/name if isinstance(name, str) else name for name in inputs)
+    deps = inputs
+    command = LD + LDFLAGS
+    if LDSCRIPT is not None:
+        command += ("-T", LDSCRIPT)
+        deps += (LDSCRIPT,)
+    command += ("-o", output) + inputs
+
+    return Rule(
+        provides = (output,),
+        depends = deps,
+        commands = [command])

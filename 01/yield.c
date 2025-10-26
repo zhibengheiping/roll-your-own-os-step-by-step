@@ -1,35 +1,39 @@
-#include <stdio.h>
 #include <unistd.h>
-#include "task.h"
+#include "sched.h"
+#include "osrt.h"
 
 void
 solong(void) {
+  static const char greet[] = "So long\n";
   for (;;) {
-    printf("So long\n");
-    fflush(stdout);
-    sleep(1);
+    write(STDOUT_FILENO, greet, sizeof(greet));
     task_yield();
   }
 }
 
 void
 thanks(void) {
+  static const char greet[] = "Thanks for all the fish\n";
   for (;;) {
-    printf("Thanks for all the fish\n");
-    fflush(stdout);
-    sleep(1);
+    write(STDOUT_FILENO, greet, sizeof(greet));
     task_yield();
   }
 }
 
-int
-main(void) {
+static char task1_stack[8192] __attribute__((aligned(4096))) = {0};
+static char task2_stack[8192] __attribute__((aligned(4096))) = {0};
+
+struct task task_main;
+
+void
+kernel_main(void) {
+  sched_init();
   struct task task1, task2;
-  task_init(&task1, solong, 8192);
-  task_init(&task2, thanks, 8192);
+  task_init(&task1, solong, task1_stack + sizeof(task1_stack));
+  task_init(&task2, thanks, task2_stack + sizeof(task2_stack));
   task1.next = &task2;
   task2.next = &task1;
   task_main.next = &task1;
+
   task_yield();
-  return 0;
 }

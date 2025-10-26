@@ -8,7 +8,7 @@ struct task {
 };
 
 extern struct task task_main;
-extern struct task *task_current;
 
-void task_init(struct task *task, void (*f)(void), size_t stack_size);
+void sched_init(void);
+void task_init(struct task *task, void (*f)(void), void *stack_top);
 void task_yield(void);
