@@ -592,8 +592,8 @@ def process_rule(counter, rule, updated, log, always_build, dry_run, verbose):
     if (not always_build) and (old_start_time is not None):
         state = check_updated(updated, old_start_time, rule.depends)
         if not state:
-            for name in rule.depends:
-                updated[abspath(name)] = state
+            # for name in rule.depends:
+            #     updated[abspath(name)] = state
 
             if verbose:
                 message = "reuse" if state is False else "dep failed"

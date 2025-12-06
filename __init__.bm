@@ -44,3 +44,14 @@ def ld(output, *inputs):
         provides = (output,),
         depends = deps,
         commands = [command])
+
+def tar(output, *inputs):
+    if isinstance(output, str):
+        output = PWD / output
+    inputs = tuple(PWD/name if isinstance(name, str) else name for name in inputs)
+    deps = inputs
+    command = ("tar", "--sort=name", "--owner=0", "--group=0", "--mode=0", "--numeric-owner", "--mtime=@0",  "-cf", output) + inputs
+    return Rule(
+        provides = (output,),
+        depends = deps,
+        commands = [command])

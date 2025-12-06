@@ -4,5 +4,7 @@
 *.elf
 *.efi
 *.so
+*.obj
+*.tar
 .ninja_log
 .bake_log

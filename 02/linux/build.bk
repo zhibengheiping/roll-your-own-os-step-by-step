@@ -1,0 +1,4 @@
+OBJS = {path.with_suffix(".o"): path for path in PWD.glob("*.c")}
+
+for obj, src in OBJS.items():
+    build(cc)(obj, src)

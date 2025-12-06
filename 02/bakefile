@@ -1,0 +1,67 @@
+#!../bake -f
+
+from .. import cc, ld, tar
+
+CFLAGS = (
+    "-g",
+    "-O0",
+    "-mgeneral-regs-only",
+    "-mno-red-zone",
+    "-fpie",
+    "-flto", "-ffat-lto-objects",
+    "-fno-sanitize=all",
+    "-fcf-protection=none",
+    "-fno-stack-protector",
+    "-fno-stack-clash-protection",
+    "-fno-builtin",
+    "-fomit-frame-pointer",
+    "-D_GNU_SOURCE")
+
+OBJS = {path.with_suffix(".o"): path for path in PWD.glob("*.c")}
+
+for obj, src in OBJS.items():
+    build(cc)(obj, src)
+
+TARGETS = ["solong", "thanks"]
+
+LDFLAGS = ("-shared", "-nostdlib", "-Wl,-emain")
+for name in TARGETS:
+    build(cc)(f"{name}.so", f"{name}.o")
+build(tar)("so.tar", "solong.so", "thanks.so")
+
+LDFLAGS = ("-static", "-pie", "-nostdlib", "-Wl,-emain")
+for name in TARGETS:
+    build(cc)(f"{name}.elf", f"{name}.o", "libc.o")
+build(tar)("elf.tar", "solong.elf", "thanks.elf")
+
+TARGETS = {
+    "initrd": ["initrd.o", "elf.o", "extent.o", "sched.o", "tar.o"],
+    "adspc": ["adspc.o", "elf.o", "extent.o", "paging.o", "sched2.o", "tar.o"],
+    "user": ["user.o", "syscall.o", "elf.o", "extent.o", "paging.o", "sched3.o", "tar.o"]
+}
+
+linux = include("linux/build.bk")
+LDFLAGS = ("-pie",)
+for name, objs in TARGETS.items():
+    build(cc)(f"{name}.elf", *objs, *linux.OBJS)
+
+
+efi = include("efi/build.bk")
+LDFLAGS = CFLAGS + ("-x", "lto", "-c")
+for name, objs in TARGETS.items():
+    build(cc)(f"{name}.obj", *objs, *efi.OBJS)
+
+LDSCRIPT = efi.LDSCRIPT
+LDFLAGS = (
+    "-s",
+    "-pie",
+    "-nostdlib",
+    "-m", "i386pep",
+    "--oformat=pei-x86-64",
+    "--subsystem=10",
+    "--image-base=0x0",
+    "--enable-reloc-section",
+    "--exclude-all-symbols",
+    "--file-alignment=1")
+for name, objs in TARGETS.items():
+    build(ld)(f"{name}.efi", f"{name}.obj")
