@@ -1,0 +1,20 @@
+#!../bake -f
+
+from .. import cc, ld
+
+CFLAGS = (
+    "-fpie",
+    "-D_GNU_SOURCE",
+)
+
+LDFLAGS = ("-pie",)
+
+OBJS = {path.with_suffix(".o"): path for path in PWD.glob("*.c")}
+
+for obj, src in OBJS.items():
+    build(cc)(obj, src)
+
+build(cc)("edu.elf", "edu.o", "file.o", "sysfs.o", "vfio.o")
+
+LDFLAGS += ("-ljson-c",)
+build(cc)("vfio-user-edu.elf", "vfio-user-edu.o", "vfio-user-dev.o", "list.o")

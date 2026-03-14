@@ -8,3 +8,5 @@
 *.tar
 .ninja_log
 .bake_log
+initrd
+rootfs
