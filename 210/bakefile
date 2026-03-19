@@ -1,0 +1,16 @@
+#!../bake -f
+
+from .. import cc, ld
+
+CFLAGS = ("-fpie",)
+LDFLAGS = ("-pie",)
+
+OBJS = {path.with_suffix(".o"): path for path in PWD.glob("*.c")}
+
+for obj, src in OBJS.items():
+    build(cc)(obj, src)
+
+build(cc)("hello.elf", "hello.o")
+
+LDFLAGS = ('-static-pie', '-nostartfiles', '-nostdlib')
+build(cc)("exec.elf", "exec.o")
