@@ -1,0 +1,49 @@
+global CC, CFLAGS, LDFLAGS
+
+CC = ('gcc',)
+CFLAGS = ()
+LDFLAGS = ()
+
+def cc(output, *inputs):
+    if isinstance(output, str):
+        output = PWD / output
+    inputs = tuple(PWD/name if isinstance(name, str) else name for name in inputs)
+    depfile = None
+    provides = (output,)
+
+    command = CC
+    if output.suffix == '.o':
+        depfile = output.with_suffix(".d")
+        command += ("-c", "-MMD", "-MF", depfile) + CFLAGS
+        provides += (depfile,)
+    else:
+        command += LDFLAGS
+
+    command += ("-o", output) + inputs
+
+    return Rule(
+        provides = provides,
+        depends = inputs,
+        commands = [command],
+        depfile = depfile)
+
+
+def wayland_protocol(dir, name):
+    if isinstance(dir, str):
+        dir = PWD/dir
+
+    xml = f'/usr/share/wayland-protocols/stable/{name}/{name}.xml'
+    src = dir/f'{name}-protocol.c'
+    header = src.with_suffix(".h")
+    obj = src.with_suffix(".o")
+
+    provides = (header, src, obj)
+
+    return Rule(
+        provides = provides,
+        depends = (),
+        commands = [
+            ('wayland-scanner', 'client-header', xml, header),
+            ('wayland-scanner', 'private-code', xml, src),
+            CC + CFLAGS + ("-c", "-o", obj, src)
+        ])

@@ -1,0 +1,41 @@
+global GNAT, COMPILE_FLAGS, BIND_FLAGS, LINK_FLAGS
+
+GNAT = ('gnat',)
+COMPILE_FLAGS = ()
+BIND_FLAGS = ()
+LINK_FLAGS = ()
+
+def compile(input):
+    if isinstance(input, str):
+        input = PWD / input
+
+    return Rule(
+        provides = (input.with_suffix(".o"), input.with_suffix(".ali")),
+        depends = (input, input.with_suffix(".ads")),
+        commands = [GNAT + ('compile',) + COMPILE_FLAGS + (input,)])
+
+def bind(input):
+    if isinstance(input, str):
+        input = PWD / input
+
+    output = input.parent / f"b~{input.name}"
+
+    return Rule(
+        provides = (output.with_suffix(".adb"), output.with_suffix(".ads")),
+        depends = (input,),
+        commands = [GNAT + ('bind', ) + BIND_FLAGS + (input,)])
+
+def link(output, input):
+    if isinstance(output, str):
+        output = PWD / output
+
+    if isinstance(input, str):
+        input = PWD / input
+
+    b = input.parent / f"b~{input.name}"
+
+    return Rule(
+        provides = (output,),
+        depends = (input, input.with_suffix(".o"),
+                   b, b.with_suffix(".o")),
+        commands = [GNAT + ('link',) + LINK_FLAGS + ('-o', output, input)])

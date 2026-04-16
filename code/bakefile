@@ -1,0 +1,53 @@
+from .gnat import compile, bind, link
+from .cc import cc, wayland_protocol
+
+COMPILE_FLAGS = ('-q', '-g', '-fPIC')
+build(compile)('stacktrace.adb')
+
+BIND_FLAGS = ('-a', '-n', '-Es')
+build(bind)('stacktrace.ali')
+
+build(compile)('b~stacktrace.adb')
+
+LINK_FLAGS = ('-g', '-shared', '-n')
+build(link)('stacktrace.so', 'stacktrace.ali')
+
+
+CFLAGS = ("-g", "-fpie")
+
+OBJS = {path.with_suffix(".o"): path for path in PWD.glob("*.c")}
+
+
+LDFLAGS = ("-g", "-pie")
+
+TARGETS = {
+    "assert": ["assert.o"],
+    "print-time": ["print-time.o"],
+    "clock-sleep": ["clock-sleep.o", "print-time.o"],
+    "clock-epoll": ["clock-epoll.o", "print-time.o"],
+    "clock-timerfd": ["clock-timerfd.o", "print-time.o"],
+    "clock-alarm": ["clock-alarm.o", "print-time.o"],
+}
+
+for obj in set().union(*TARGETS.values()):
+    obj = PWD/obj
+    src = obj.with_suffix(".c")
+    build(cc)(obj, src)
+
+for name, objs in TARGETS.items():
+    build(cc)(f"{name}.elf", *objs)
+
+
+from subprocess import check_output
+from shlex import split
+
+def pkgconfig(*args):
+    return tuple(split(check_output(("pkg-config", *args), text=True)))
+
+build(cc, CFLAGS=CFLAGS+pkgconfig("--cflags", "cairo"))("draw-clock.o", "draw-clock.c")
+build(cc, LDFLAGS=LDFLAGS+pkgconfig("--libs", "cairo"))("draw-clock.elf", "draw-clock.o")
+
+build(wayland_protocol)("generated", "xdg-shell")
+
+build(cc, CFLAGS=CFLAGS+pkgconfig("--cflags", "wayland-client", "cairo"))("clock-shm.o", "clock-shm.c")
+build(cc, LDFLAGS=LDFLAGS+pkgconfig("--libs", "wayland-client", "cairo"))("clock-shm.elf", "clock-shm.o", "generated/xdg-shell-protocol.o", "draw-clock.o")

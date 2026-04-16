@@ -1,0 +1,9 @@
+*~
+.bake_log
+*.so
+*.elf
+*.o
+*.d
+*.ali
+b~*.*
+generated/
