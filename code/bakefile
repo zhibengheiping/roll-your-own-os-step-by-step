@@ -1,16 +1,6 @@
-from .gnat import compile, bind, link
 from .cc import cc, wayland_protocol
 
-COMPILE_FLAGS = ('-q', '-g', '-fPIC')
-build(compile)('stacktrace.adb')
-
-BIND_FLAGS = ('-a', '-n', '-Es')
-build(bind)('stacktrace.ali')
-
-build(compile)('b~stacktrace.adb')
-
-LINK_FLAGS = ('-g', '-shared', '-n')
-build(link)('stacktrace.so', 'stacktrace.ali')
+include("stacktrace.bk")
 
 build(wayland_protocol)("generated", "xdg-shell/xdg-shell")
 build(wayland_protocol)("generated", "linux-dmabuf/linux-dmabuf-v1")

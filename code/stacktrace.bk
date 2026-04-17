@@ -1,9 +1,7 @@
-global GNAT, COMPILE_FLAGS, BIND_FLAGS, LINK_FLAGS
-
 GNAT = ('gnat',)
-COMPILE_FLAGS = ()
-BIND_FLAGS = ()
-LINK_FLAGS = ()
+COMPILE_FLAGS = ('-q', '-g', '-fPIC')
+BIND_FLAGS = ('-a', '-n', '-Es')
+LINK_FLAGS = ('-g', '-shared', '-n')
 
 def compile(input):
     if isinstance(input, str):
@@ -39,3 +37,9 @@ def link(output, input):
         depends = (input, input.with_suffix(".o"),
                    b, b.with_suffix(".o")),
         commands = [GNAT + ('link',) + LINK_FLAGS + ('-o', output, input)])
+
+
+build(compile)('stacktrace.adb')
+build(bind)('stacktrace.ali')
+build(compile)('b~stacktrace.adb')
+build(link)('stacktrace.so', 'stacktrace.ali')
