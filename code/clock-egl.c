@@ -1,16 +1,18 @@
-#define _GNU_SOURCE
 #include <assert.h>
+#include <stdio.h>
 #include <string.h>
-#include <unistd.h>
-#include <sys/mman.h>
 #include <wayland-client.h>
+#include <wayland-egl.h>
+
+#define EGL_EGL_PROTOTYPES 1
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
 
 #include "generated/xdg-shell-protocol.h"
-#include "draw-clock.h"
+#include "gl-draw-clock.h"
 
 struct globals {
   struct wl_compositor *compositor;
-  struct wl_shm *shm;
   struct xdg_wm_base *xdg_wm_base;
 };
 
@@ -20,8 +22,6 @@ registry_global(void *data, struct wl_registry *reg, uint32_t id, const char *in
   struct globals *globals = data;
   if (strcmp(interface, wl_compositor_interface.name) == 0) {
     globals->compositor = wl_registry_bind(reg, id, &wl_compositor_interface, version);
-  } else if (strcmp(interface, wl_shm_interface.name) == 0) {
-    globals->shm = wl_registry_bind(reg, id, &wl_shm_interface, version);
   } else if (strcmp(interface, xdg_wm_base_interface.name) == 0) {
     globals->xdg_wm_base = wl_registry_bind(reg, id, &xdg_wm_base_interface, version);
   }
@@ -41,8 +41,8 @@ xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t seri
 
 struct frame_context {
   struct wl_surface *wl_surface;
-  struct wl_buffer *wl_buffer;
-  cairo_surface_t *cr_surface;
+  EGLDisplay egl_display;
+  EGLSurface egl_surface;
 };
 
 static
@@ -53,12 +53,8 @@ void
 request_frame(struct frame_context *context) {
   struct wl_callback *cb = wl_surface_frame(context->wl_surface);
   wl_callback_add_listener(cb, &frame_callback_listener, context);
-
-  struct wl_callback *frame_cb = wl_surface_frame(context->wl_surface);
-  draw_clock(context->cr_surface);
-  wl_surface_attach(context->wl_surface, context->wl_buffer, 0, 0);
-  wl_surface_damage(context->wl_surface, 0, 0, INT32_MAX, INT32_MAX);
-  wl_surface_commit(context->wl_surface);
+  gl_draw_clock();
+  eglSwapBuffers(context->egl_display, context->egl_surface);
 }
 
 static
@@ -93,7 +89,6 @@ main(void) {
   assert(wl_display_roundtrip(wl_display) > 0);
 
   assert(globals.compositor != NULL);
-  assert(globals.shm != NULL);
   assert(globals.xdg_wm_base != NULL);
 
   struct xdg_wm_base_listener xdg_wm_base_listener = {
@@ -120,30 +115,56 @@ main(void) {
 
   size_t width = 400;
   size_t height = 400;
-  size_t stride = width * 4;
-  size_t size = stride * height;
 
-  int fd = memfd_create("shm", MFD_CLOEXEC);
-  assert(fd >= 0);
-  assert(ftruncate(fd, size) == 0);
+  struct wl_egl_window *egl_window = wl_egl_window_create(wl_surface, width, height);
+  assert(egl_window != NULL);
 
-  void *buf = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-  assert(buf != MAP_FAILED);
+  EGLDisplay egl_display = eglGetPlatformDisplay(EGL_PLATFORM_WAYLAND_KHR, wl_display, NULL);
+  assert(egl_display != EGL_NO_DISPLAY);
 
-  struct wl_shm_pool *wl_shm_pool = wl_shm_create_pool(globals.shm, fd, size);
-  assert(wl_shm_pool != NULL);
-  struct wl_buffer *wl_buffer = wl_shm_pool_create_buffer(wl_shm_pool, 0, width, height, stride, WL_SHM_FORMAT_ARGB8888);
-  assert(wl_buffer != NULL);
-  wl_shm_pool_destroy(wl_shm_pool);
-  close(fd);
+  EGLint major;
+  EGLint minor;
+  assert(eglInitialize(egl_display, &major, &minor) == EGL_TRUE);
+  fprintf(stderr, "EGL Version %d.%d\n", major, minor);
 
-  cairo_surface_t *cr_surface = cairo_image_surface_create_for_data(buf, CAIRO_FORMAT_ARGB32, width, height, stride);
-  assert(cr_surface != NULL);
+  assert(eglBindAPI(EGL_OPENGL_API) == EGL_TRUE);
+
+  EGLint config_attributes[] = {
+    EGL_SURFACE_TYPE,    EGL_WINDOW_BIT,
+    EGL_RED_SIZE,        8,
+    EGL_GREEN_SIZE,      8,
+    EGL_BLUE_SIZE,       8,
+    EGL_ALPHA_SIZE,      8,
+    EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
+    EGL_NONE,
+  };
+
+  EGLint count;
+  EGLConfig egl_config;
+
+  assert(eglChooseConfig(egl_display, &config_attributes[0], &egl_config, 1, &count) == EGL_TRUE);
+  assert(count > 0);
+
+  EGLSurface egl_surface = eglCreateWindowSurface(egl_display, egl_config, egl_window, NULL);
+  assert(egl_surface != EGL_NO_SURFACE);
+
+  EGLint context_attributes[] = {
+    EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT,
+    EGL_CONTEXT_CLIENT_VERSION,      4,
+    EGL_CONTEXT_MINOR_VERSION_KHR,   3,
+    EGL_NONE,
+  };
+
+  EGLContext egl_context = eglCreateContext(egl_display, egl_config, EGL_NO_CONTEXT, &context_attributes[0]);
+  assert(egl_context != EGL_NO_CONTEXT);
+  assert(eglMakeCurrent(egl_display, egl_surface, egl_surface, egl_context) == EGL_TRUE);
+
+  gl_draw_clock_init();
 
   struct frame_context context = {
     .wl_surface = wl_surface,
-    .wl_buffer = wl_buffer,
-    .cr_surface = cr_surface,
+    .egl_display = egl_display,
+    .egl_surface = egl_surface,
   };
 
   request_frame(&context);

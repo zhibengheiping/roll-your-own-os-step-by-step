@@ -12,31 +12,8 @@ build(compile)('b~stacktrace.adb')
 LINK_FLAGS = ('-g', '-shared', '-n')
 build(link)('stacktrace.so', 'stacktrace.ali')
 
-
-CFLAGS = ("-g", "-fpie")
-
-OBJS = {path.with_suffix(".o"): path for path in PWD.glob("*.c")}
-
-
-LDFLAGS = ("-g", "-pie")
-
-TARGETS = {
-    "assert": ["assert.o"],
-    "print-time": ["print-time.o"],
-    "clock-sleep": ["clock-sleep.o", "print-time.o"],
-    "clock-epoll": ["clock-epoll.o", "print-time.o"],
-    "clock-timerfd": ["clock-timerfd.o", "print-time.o"],
-    "clock-alarm": ["clock-alarm.o", "print-time.o"],
-}
-
-for obj in set().union(*TARGETS.values()):
-    obj = PWD/obj
-    src = obj.with_suffix(".c")
-    build(cc)(obj, src)
-
-for name, objs in TARGETS.items():
-    build(cc)(f"{name}.elf", *objs)
-
+build(wayland_protocol)("generated", "xdg-shell/xdg-shell")
+build(wayland_protocol)("generated", "linux-dmabuf/linux-dmabuf-v1")
 
 from subprocess import check_output
 from shlex import split
@@ -44,10 +21,44 @@ from shlex import split
 def pkgconfig(*args):
     return tuple(split(check_output(("pkg-config", *args), text=True)))
 
-build(cc, CFLAGS=CFLAGS+pkgconfig("--cflags", "cairo"))("draw-clock.o", "draw-clock.c")
-build(cc, LDFLAGS=LDFLAGS+pkgconfig("--libs", "cairo"))("draw-clock.elf", "draw-clock.o")
+CFLAGS = ("-g", "-fpie", "-ffunction-sections")
 
-build(wayland_protocol)("generated", "xdg-shell")
+LDFLAGS = ("-g", "-pie", "-Wl,--gc-sections")
 
-build(cc, CFLAGS=CFLAGS+pkgconfig("--cflags", "wayland-client", "cairo"))("clock-shm.o", "clock-shm.c")
-build(cc, LDFLAGS=LDFLAGS+pkgconfig("--libs", "wayland-client", "cairo"))("clock-shm.elf", "clock-shm.o", "generated/xdg-shell-protocol.o", "draw-clock.o")
+TARGETS = {
+    "assert": [],
+    "print-time": [],
+    "clock-sleep": ["print-time"],
+    "clock-epoll": ["print-time"],
+    "clock-timerfd": ["print-time"],
+    "clock-alarm": ["print-time"],
+    "draw-clock": [],
+    "clock-shm": ["draw-clock", "generated/xdg-shell-protocol"],
+    "gl-draw-clock": [],
+    "clock-egl": ["gl-draw-clock", "generated/xdg-shell-protocol"],
+    "clock-dmabuf": ["gl-draw-clock", "generated/xdg-shell-protocol", "generated/linux-dmabuf-v1-protocol"],
+}
+
+PKGCONF = {
+    "draw-clock": ["cairo"],
+    "clock-shm": ["cairo", "wayland-client"],
+    "gl-draw-clock": ["cairo", "egl", "gl"],
+    "clock-egl": ["egl", "gl", "wayland-egl"],
+    "clock-dmabuf": ["egl", "gbm", "gl", "libudev", "wayland-egl"],
+}
+
+for name in set().union(TARGETS, *TARGETS.values()):
+    obj = PWD/f"{name}.o"
+    src = obj.with_suffix(".c")
+    if name in PKGCONF:
+        build(cc,CFLAGS=CFLAGS+pkgconfig("--cflags",*PKGCONF[name]))(obj,src)
+    else:
+        build(cc)(obj,src)
+
+for name, objs in TARGETS.items():
+    objs = [f"{name}.o", *(f"{obj}.o" for obj in objs)]
+    elf = f"{name}.elf"
+    if name in PKGCONF:
+        build(cc,LDFLAGS=LDFLAGS+pkgconfig("--libs",*PKGCONF[name]))(elf,*objs)
+    else:
+        build(cc)(elf,*objs)
