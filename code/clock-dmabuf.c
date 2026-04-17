@@ -268,6 +268,31 @@ main(void) {
 
   struct gbm_device *gbm = gbm_create_device(gbm_fd);
   assert(gbm != NULL);
+
+  struct gbm_bo *bo = gbm_bo_create(gbm, 400, 400, GBM_FORMAT_ARGB8888, GBM_BO_USE_RENDERING);
+  assert(bo != NULL);
+  struct zwp_linux_buffer_params_v1 *params = zwp_linux_dmabuf_v1_create_params(globals.zwp_linux_dmabuf_v1);
+  assert(params != NULL);
+  int fd = gbm_bo_get_fd(bo);
+  assert(fd >= 0);
+
+  uint32_t stride = gbm_bo_get_stride(bo);
+  uint64_t modifier = gbm_bo_get_modifier(bo);
+  uint32_t modifier_lo = modifier & 0xFFFFFFFF;
+  uint32_t modifier_hi = modifier >> 32;
+  int plane_count = gbm_bo_get_plane_count(bo);
+  for (int i=0; i<plane_count; ++i) {
+    uint32_t offset = gbm_bo_get_offset(bo, i);
+    zwp_linux_buffer_params_v1_add(params, fd, i, offset, stride, modifier_hi, modifier_lo);
+  }
+
+  uint32_t width = gbm_bo_get_width(bo);
+  uint32_t height = gbm_bo_get_height(bo);
+  uint32_t format = gbm_bo_get_format(bo);
+
+  struct wl_buffer *wl_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, format, 0);
+  assert(wl_buffer != NULL);
+
   EGLDisplay egl_display = eglGetPlatformDisplay(EGL_PLATFORM_GBM_KHR, gbm, NULL);
   assert(egl_display != EGL_NO_DISPLAY);
 
@@ -292,30 +317,6 @@ main(void) {
   EGLConfig egl_config;
   assert(eglChooseConfig(egl_display, &config_attributes[0], &egl_config, 1, &count) == EGL_TRUE);
   assert(count > 0);
-
-  struct gbm_bo *bo = gbm_bo_create(gbm, 400, 400, GBM_FORMAT_ARGB8888, GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
-  assert(bo != NULL);
-  struct zwp_linux_buffer_params_v1 *params = zwp_linux_dmabuf_v1_create_params(globals.zwp_linux_dmabuf_v1);
-  assert(params != NULL);
-  int fd = gbm_bo_get_fd(bo);
-  assert(fd >= 0);
-
-  uint32_t stride = gbm_bo_get_stride(bo);
-  uint64_t modifier = gbm_bo_get_modifier(bo);
-  uint32_t modifier_lo = modifier & 0xFFFFFFFF;
-  uint32_t modifier_hi = modifier >> 32;
-  int plane_count = gbm_bo_get_plane_count(bo);
-  for (int i=0; i<plane_count; ++i) {
-    uint32_t offset = gbm_bo_get_offset(bo, i);
-    zwp_linux_buffer_params_v1_add(params, fd, i, offset, stride, modifier_hi, modifier_lo);
-  }
-
-  uint32_t width = gbm_bo_get_width(bo);
-  uint32_t height = gbm_bo_get_height(bo);
-  uint32_t format = gbm_bo_get_format(bo);
-
-  struct wl_buffer *wl_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, format, 0);
-  assert(wl_buffer != NULL);
 
   EGLAttrib attributes[] = {
     EGL_WIDTH,                          width,
@@ -365,19 +366,19 @@ main(void) {
 
   gl_draw_clock_init();
 
-  GLuint fbo;
-  glGenFramebuffers(1, &fbo);
-  glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-  glFramebufferParameteri(GL_FRAMEBUFFER, GL_FRAMEBUFFER_FLIP_Y_MESA, GL_TRUE);
   GLuint texture;
   glGenTextures(1, &texture);
-
   glBindTexture(GL_TEXTURE_2D, texture);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, image);
+
+  GLuint fbo;
+  glGenFramebuffers(1, &fbo);
+  glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+  glFramebufferParameteri(GL_FRAMEBUFFER, GL_FRAMEBUFFER_FLIP_Y_MESA, GL_TRUE);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
   glViewport(0, 0, width, height);
 
