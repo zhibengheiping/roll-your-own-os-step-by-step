@@ -4,8 +4,8 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <sys/mman.h>
-#include <wayland-client.h>
-#include <wayland-egl.h>
+#include <wayland-client-core.h>
+#include <wayland-egl-core.h>
 #include <gbm.h>
 #include <libudev.h>
 
@@ -16,8 +16,8 @@
 #define GL_GLEXT_PROTOTYPES
 #include <GL/gl.h>
 
-#include "generated/xdg-shell-protocol.h"
-#include "generated/linux-dmabuf-v1-protocol.h"
+#include "generated/xdg-shell-client-protocol.h"
+#include "generated/linux-dmabuf-v1-client-protocol.h"
 #include "gl-draw-clock.h"
 
 struct globals {
@@ -66,7 +66,7 @@ request_frame(struct frame_context *context) {
   wl_callback_add_listener(cb, &frame_callback_listener, context);
   gl_draw_clock();
   wl_surface_attach(context->wl_surface, context->wl_buffer, 0, 0);
-  wl_surface_damage(context->wl_surface, 0, 0, INT32_MAX, INT32_MAX);
+  wl_surface_damage_buffer(context->wl_surface, 0, 0, INT32_MAX, INT32_MAX);
   wl_surface_commit(context->wl_surface);
 }
 
@@ -222,6 +222,7 @@ main(void) {
 
   assert(globals.compositor != NULL);
   assert(globals.xdg_wm_base != NULL);
+  assert(globals.zwp_linux_dmabuf_v1 != NULL);
 
   struct xdg_wm_base_listener xdg_wm_base_listener = {
     .ping = xdg_wm_base_ping,

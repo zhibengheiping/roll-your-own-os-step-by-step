@@ -1,14 +1,14 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#include <wayland-client.h>
-#include <wayland-egl.h>
+#include <wayland-client-core.h>
+#include <wayland-egl-core.h>
 
 #define EGL_EGL_PROTOTYPES 1
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
-#include "generated/xdg-shell-protocol.h"
+#include "generated/xdg-shell-client-protocol.h"
 #include "gl-draw-clock.h"
 
 struct globals {

@@ -3,9 +3,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/mman.h>
-#include <wayland-client.h>
+#include <wayland-client-core.h>
 
-#include "generated/xdg-shell-protocol.h"
+#include "generated/xdg-shell-client-protocol.h"
 #include "draw-clock.h"
 
 struct globals {
@@ -57,7 +57,7 @@ request_frame(struct frame_context *context) {
   struct wl_callback *frame_cb = wl_surface_frame(context->wl_surface);
   draw_clock(context->cr_surface);
   wl_surface_attach(context->wl_surface, context->wl_buffer, 0, 0);
-  wl_surface_damage(context->wl_surface, 0, 0, INT32_MAX, INT32_MAX);
+  wl_surface_damage_buffer(context->wl_surface, 0, 0, INT32_MAX, INT32_MAX);
   wl_surface_commit(context->wl_surface);
 }
 

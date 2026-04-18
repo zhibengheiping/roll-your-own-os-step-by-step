@@ -1,0 +1,25 @@
+def wayland_protocol(name):
+    xml = f'/usr/share/wayland-protocols/stable/{name}.xml'
+    name = name.split("/", 1)[1]
+
+    src = PWD/"generated"/f'{name}-protocol.c'
+    server_header = PWD/"generated"/f'{name}-server-protocol.h'
+    client_header = PWD/"generated"/f'{name}-client-protocol.h'
+    provides = (src, server_header, client_header)
+
+    return Rule(
+        provides = provides,
+        depends = (),
+        commands = [
+            ('wayland-scanner', 'client-header', xml, client_header),
+            ('wayland-scanner', 'server-header', xml, server_header),
+            ('wayland-scanner', 'private-code', xml, src),
+        ])
+
+PROTOCOLS = [
+    "xdg-shell/xdg-shell",
+    "linux-dmabuf/linux-dmabuf-v1",
+]
+
+for p in PROTOCOLS:
+    build(wayland_protocol)(p)

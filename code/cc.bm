@@ -26,24 +26,3 @@ def cc(output, *inputs):
         depends = inputs,
         commands = [command],
         depfile = depfile)
-
-
-def wayland_protocol(dir, name):
-    if isinstance(dir, str):
-        dir = PWD/dir
-
-    xml = f'/usr/share/wayland-protocols/stable/{name}.xml'
-    name = name.split("/", 1)[1]
-
-    src = dir/f'{name}-protocol.c'
-    header = src.with_suffix(".h")
-
-    provides = (header, src)
-
-    return Rule(
-        provides = provides,
-        depends = (),
-        commands = [
-            ('wayland-scanner', 'client-header', xml, header),
-            ('wayland-scanner', 'private-code', xml, src),
-        ])

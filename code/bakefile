@@ -1,9 +1,7 @@
-from .cc import cc, wayland_protocol
+from .cc import cc
 
 include("stacktrace.bk")
-
-build(wayland_protocol)("generated", "xdg-shell/xdg-shell")
-build(wayland_protocol)("generated", "linux-dmabuf/linux-dmabuf-v1")
+include("wayland.bk")
 
 from subprocess import check_output
 from shlex import split
@@ -27,6 +25,7 @@ TARGETS = {
     "gl-draw-clock": [],
     "clock-egl": ["gl-draw-clock", "generated/xdg-shell-protocol"],
     "clock-dmabuf": ["gl-draw-clock", "generated/xdg-shell-protocol", "generated/linux-dmabuf-v1-protocol"],
+    "wayland-wayland": ["generated/xdg-shell-protocol", "generated/linux-dmabuf-v1-protocol"],
 }
 
 PKGCONF = {
@@ -35,6 +34,7 @@ PKGCONF = {
     "gl-draw-clock": ["cairo", "egl", "gl"],
     "clock-egl": ["egl", "gl", "wayland-egl"],
     "clock-dmabuf": ["egl", "gbm", "gl", "libudev", "wayland-egl"],
+    "wayland-wayland": ["wayland-client", "wayland-server"],
 }
 
 for name in set().union(TARGETS, *TARGETS.values()):

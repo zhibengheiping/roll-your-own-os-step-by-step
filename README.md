@@ -8,3 +8,5 @@
 
 - [调用栈](./xxxx-调用栈.md)
 - [DMA-BUF](./xxxx-dmabuf.md)
+- [自制Wayland Server](./xxxx-自制Wayland_Server.md)
+- [运行virgl test server](./xxxx-运行virgl_test_server.md)
