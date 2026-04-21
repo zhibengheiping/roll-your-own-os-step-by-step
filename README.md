@@ -11,3 +11,4 @@
 - [DMA-BUF](./xxxx-dmabuf.md)
 - [自制Wayland Server](./xxxx-自制Wayland_Server.md)
 - [运行virgl test server](./xxxx-运行virgl_test_server.md)
+- [用QEMU运行Linux](./xxxx-用QEMU运行Linux.md)

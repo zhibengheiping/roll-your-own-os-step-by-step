@@ -26,6 +26,8 @@ TARGETS = {
     "clock-egl": ["gl-draw-clock", "generated/xdg-shell-protocol"],
     "clock-dmabuf": ["gl-draw-clock", "generated/xdg-shell-protocol", "generated/linux-dmabuf-v1-protocol"],
     "wayland-wayland": ["generated/xdg-shell-protocol", "generated/linux-dmabuf-v1-protocol"],
+    "clock-kms": ["draw-clock"],
+    "clock-gbm": ["gl-draw-clock"],
 }
 
 PKGCONF = {
@@ -35,6 +37,8 @@ PKGCONF = {
     "clock-egl": ["egl", "gl", "wayland-egl"],
     "clock-dmabuf": ["egl", "gbm", "gl", "libudev", "wayland-egl"],
     "wayland-wayland": ["wayland-client", "wayland-server"],
+    "clock-kms": ["cairo", "libdrm"],
+    "clock-gbm": ["egl", "gbm", "gl", "libdrm"],
 }
 
 for name in set().union(TARGETS, *TARGETS.values()):
