@@ -20,6 +20,7 @@ TARGETS = {
     "clock-epoll": ["print-time"],
     "clock-timerfd": ["print-time"],
     "clock-alarm": ["print-time"],
+    "raw": [],
     "draw-clock": [],
     "clock-shm": ["draw-clock", "generated/xdg-shell-protocol"],
     "gl-draw-clock": [],
