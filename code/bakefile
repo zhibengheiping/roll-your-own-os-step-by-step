@@ -31,6 +31,7 @@ TARGETS = {
     "clock-gbm": ["gl-draw-clock"],
     "edu": ["vfio"],
     "console-virtio": ["vfio", "virtio"],
+    "clock-virtio": ["draw-clock", "vfio", "virtio", "virtio-gpu"],
 }
 
 PKGCONF = {
@@ -42,6 +43,7 @@ PKGCONF = {
     "wayland-wayland": ["wayland-client", "wayland-server"],
     "clock-kms": ["cairo", "libdrm"],
     "clock-gbm": ["egl", "gbm", "gl", "libdrm"],
+    "clock-virtio": ["cairo"],
 }
 
 for name in set().union(TARGETS, *TARGETS.values()):

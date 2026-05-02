@@ -385,7 +385,7 @@ vfio_pci_dev_set_irqs(struct vfio_pci_dev *dev) {
       dev->eventfd[i] = -1;
 
     for(__u32 i=0; i<num; i++) {
-      int fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+      int fd = eventfd(0, EFD_CLOEXEC);
       assert(fd >= 0);
       dev->eventfd[i] = fd;
       ((int *)&irq_set->data)[i] = fd;

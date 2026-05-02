@@ -38,8 +38,9 @@ supply_buffer(struct virtio_queue *queue, void *buf, size_t len, int read) {
     .iov_len = len,
   };
 
-  int index = virtio_queue_writev(queue, &iovec, 1, read);
+  int index = virtio_queue_alloc(queue, 1);
   assert(index >= 0);
+  virtio_queue_writev(queue, index, &iovec, 1, read);
   virtio_queue_send(queue, index);
 }
 

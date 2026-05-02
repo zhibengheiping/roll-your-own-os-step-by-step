@@ -38,11 +38,13 @@ set_queue_addr(uint32_t volatile *lo, uint32_t volatile *hi, uint64_t addr) {
   *hi = addr >> 32;
 }
 
+static
 size_t
 align_down(size_t addr, size_t align) {
   return addr - addr % align;
 }
 
+static
 size_t
 align_up(size_t addr, size_t align) {
   return align_down(addr + align - 1, align);
@@ -171,8 +173,7 @@ virtio_send_driver_ok(struct virtio_pci_dev *dev) {
 }
 
 int
-virtio_queue_writev(struct virtio_queue *queue, const struct iovec *iov, int iovcnt, int readcnt) {
-  assert(readcnt <= iovcnt);
+virtio_queue_alloc(struct virtio_queue *queue, int iovcnt) {
   if (queue->free_count < iovcnt)
     return -1;
 
@@ -183,7 +184,20 @@ virtio_queue_writev(struct virtio_queue *queue, const struct iovec *iov, int iov
 
   for (int i=0; i<iovcnt; ++i) {
     --(queue->free_count);
+    index = desc[index].next;
+  }
 
+  queue->free_head = index;
+  return first;
+}
+
+void
+virtio_queue_writev(struct virtio_queue *queue, uint16_t index, const struct iovec *iov, int iovcnt, int readcnt) {
+  assert(readcnt <= iovcnt);
+
+  vring_desc_t *desc = queue->vring.desc;
+
+  for (int i=0; i<iovcnt; ++i) {
     desc[index].addr = (__virtio64)iov[i].iov_base;
     desc[index].len = iov[i].iov_len;
 
@@ -199,9 +213,6 @@ virtio_queue_writev(struct virtio_queue *queue, const struct iovec *iov, int iov
 
     index = desc[index].next;
   }
-
-  queue->free_head = index;
-  return first;
 }
 
 void

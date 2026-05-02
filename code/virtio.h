@@ -35,7 +35,10 @@ void
 virtio_send_driver_ok(struct virtio_pci_dev *dev);
 
 int
-virtio_queue_writev(struct virtio_queue *queue, const struct iovec *iov, int iovcnt, int readcnt);
+virtio_queue_alloc(struct virtio_queue *queue, int iovcnt);
+
+void
+virtio_queue_writev(struct virtio_queue *queue, uint16_t index, const struct iovec *iov, int iovcnt, int readcnt);
 
 void
 virtio_queue_send(struct virtio_queue *queue, uint16_t index);
