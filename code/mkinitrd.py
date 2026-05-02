@@ -14,7 +14,9 @@ def main(rootdir, mods, output):
         command = ("modinfo", "-F", field, "-k", kernel_version, mod)
         if rootdir != '/':
             command = ("fakechroot", "fakeroot", "--", "chroot", rootdir) + command
-        return check_output(command).splitlines()[0].decode()
+        stdout = check_output(command)
+        if stdout:
+            return stdout.splitlines()[0].decode()
 
     added = set()
     sorter = TopologicalSorter()
@@ -62,6 +64,8 @@ mount -t overlay overlay -o lowerdir=/rootfs,upperdir=/upper,workdir=/work /sysr
 cd /sysroot
 mkdir -p dev
 mount -t devtmpfs none dev
+mkdir -p dev/pts
+mount -t devpts none dev/pts
 mkdir -p proc
 mount -t proc none proc
 mkdir -p sys
