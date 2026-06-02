@@ -32,6 +32,7 @@ TARGETS = {
     "edu": ["vfio"],
     "console-virtio": ["vfio", "virtio"],
     "clock-virtio": ["draw-clock", "vfio", "virtio", "virtio-gpu"],
+    "virgl-virtio": ["vfio", "virtio", "virtio-gpu"],
 }
 
 PKGCONF = {

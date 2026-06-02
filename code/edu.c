@@ -144,7 +144,7 @@ main(int argc, char **argv) {
 
   __u64 iova = 0;
   __u64 dma_iova = iova;
-  void *dma_addr = vfio_pci_dev_map_dma(&dev, 4096, &iova);
+  void *dma_addr = vfio_pci_dev_map_dma(&dev, &iova, 4096, -1, 0);
 
   uint32_t *src_buf = (uint32_t *)dma_addr;
   uint32_t *dst_buf = src_buf + 16;
@@ -249,7 +249,8 @@ main(int argc, char **argv) {
     printf("%08x ", dst_buf[i]);
   printf("\n");
 
-  vfio_pci_dev_unmap_dma(&dev, 4096, iova);
+  vfio_pci_dev_unmap_dma(&dev, dma_iova, 4096);
+  assert(munmap(dma_addr, 4096) == 0);
   vfio_pci_dev_close(&dev);
   return 0;
 }

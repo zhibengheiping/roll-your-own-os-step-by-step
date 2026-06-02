@@ -78,8 +78,8 @@ main(int argc, char **argv) {
   struct virtio_pci_dev dev = {0};
   virtio_pci_dev_init(&dev, &pci, 0);
 
-  char *stdin_buf = vfio_pci_dev_map_dma(&pci, 4096, NULL);
-  char *stdout_buf = vfio_pci_dev_map_dma(&pci, 4096, NULL);
+  char *stdin_buf = vfio_pci_dev_map_dma(&pci, NULL, 4096, -1, 0);
+  char *stdout_buf = vfio_pci_dev_map_dma(&pci, NULL, 4096, -1, 0);
 
   virtio_send_driver_ok(&dev);
 

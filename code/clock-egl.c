@@ -36,6 +36,8 @@ xdg_wm_base_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t serial) {
 static
 void
 xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t serial) {
+  int *flag = data;
+  *flag = 1;
   xdg_surface_ack_configure(xdg_surface, serial);
 }
 
@@ -108,10 +110,17 @@ main(void) {
     .configure = xdg_surface_configure,
   };
 
-  assert(xdg_surface_add_listener(xdg_surface, &xdg_surface_listener, NULL) == 0);
+  int configured = 0;
+  assert(xdg_surface_add_listener(xdg_surface, &xdg_surface_listener, &configured) == 0);
 
   struct xdg_toplevel *xdg_toplevel = xdg_surface_get_toplevel(xdg_surface);
   assert(xdg_toplevel != NULL);
+
+  /* weston */
+  wl_surface_commit(wl_surface);
+  wl_display_flush(wl_display);
+  while (!configured)
+    wl_display_dispatch(wl_display);
 
   size_t width = 400;
   size_t height = 400;

@@ -12,3 +12,5 @@
 - [自制Wayland Server](./xxxx-自制Wayland_Server.md)
 - [运行virgl test server](./xxxx-运行virgl_test_server.md)
 - [用QEMU运行Linux](./xxxx-用QEMU运行Linux.md)
+- [QEMU里运行weston](./xxxx-QEMU里运行weston.md)
+- [自制virgl test server](./xxxx-自制virgl_test_server.md)

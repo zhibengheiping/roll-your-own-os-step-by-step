@@ -27,10 +27,10 @@ void
 vfio_pci_dev_init(struct vfio_pci_dev *dev);
 
 void *
-vfio_pci_dev_map_dma(struct vfio_pci_dev *dev, size_t size, __u64 *iova);
+vfio_pci_dev_map_dma(struct vfio_pci_dev *dev, __u64 *iova, size_t size, int fd, off_t offset);
 
 void
-vfio_pci_dev_unmap_dma(struct vfio_pci_dev *dev, size_t size, __u64 iova);
+vfio_pci_dev_unmap_dma(struct vfio_pci_dev *dev, __u64 iova, size_t size);
 
 void
 vfio_pci_dev_read_config(struct vfio_pci_dev *dev, void *buf, size_t count, off_t offset);

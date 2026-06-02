@@ -136,7 +136,7 @@ virtio_pci_dev_init(struct virtio_pci_dev *dev, struct vfio_pci_dev *pci, uint64
 
     // 4. Allocate and zero Descriptor Table, Available and Used rings for the virtqueue in contiguous physical memory
     unsigned size = vring_size(queue_size, 4096);
-    void *addr = vfio_pci_dev_map_dma(pci, align_up(size, 4096), NULL);
+    void *addr = vfio_pci_dev_map_dma(pci, NULL, align_up(size, 4096), -1, 0);
     vring_init(&queues[i].vring, queue_size, addr, 4096);
 
     for (uint16_t j=0; j<queue_size; ++j) {

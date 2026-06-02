@@ -27,6 +27,7 @@ def main(args):
     qemu_args = (
         'qemu-system-x86_64',
         '-machine', 'q35,accel=kvm,kernel-irqchip=split',
+        '-m', str(args.m),
         '-device', 'intel-iommu,intremap=on',
         '-nographic', '-no-reboot', '-net', 'none',
         '-virtfs', 'local,path=/,mount_tag=rootfs,security_model=none,readonly=on',
@@ -93,9 +94,9 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--root', default=rootdir)
     parser.add_argument("--initrd", default=os.path.join(rootdir, 'boot/initrd'))
     parser.add_argument('-q', '--quiet', action='store_true')
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument('--vga', nargs='?', const=True)
-    group.add_argument('--gpu', nargs='?', const=True)
+    parser.add_argument('-m', type=int, default=128)
+    parser.add_argument('--vga', nargs='?', const=True)
+    parser.add_argument('--gpu', nargs='?', const=True)
     parser.add_argument('--edu', action='store_true')
     parser.add_argument('--serial', action='store_true')
 

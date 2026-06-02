@@ -321,8 +321,9 @@ vfio_pci_dev_unmap_region(struct vfio_pci_dev *dev, size_t index, void *addr) {
 }
 
 void *
-vfio_pci_dev_map_dma(struct vfio_pci_dev *dev, size_t size, __u64 *iova) {
-  void *addr = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+vfio_pci_dev_map_dma(struct vfio_pci_dev *dev, __u64 *iova, size_t size, int fd, off_t offset) {
+  int flags = (fd<0)?(MAP_PRIVATE | MAP_ANONYMOUS):MAP_SHARED;
+  void *addr = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, fd, offset);
   assert(addr != MAP_FAILED);
 
   struct vfio_iommu_type1_dma_map dma_map = {
@@ -340,7 +341,7 @@ vfio_pci_dev_map_dma(struct vfio_pci_dev *dev, size_t size, __u64 *iova) {
 }
 
 void
-vfio_pci_dev_unmap_dma(struct vfio_pci_dev *dev, size_t size, __u64 iova) {
+vfio_pci_dev_unmap_dma(struct vfio_pci_dev *dev, __u64 iova, size_t size) {
   struct vfio_iommu_type1_dma_unmap dma_unmap = {
     .argsz = sizeof(dma_unmap),
     .size = size,

@@ -70,6 +70,12 @@ mkdir -p proc
 mount -t proc none proc
 mkdir -p sys
 mount -t sysfs none sys
+mount -t cgroup2 none sys/fs/cgroup
+mount -t tmpfs none run
+mkdir -p run/user/0
+export XDG_RUNTIME_DIR=/run/user/0
+mkdir -p run/udev
+mkdir -p run/systemd
 mkdir -p /sysroot$1
 mount -t 9p -o trans=virtio,version=9p2000.L,ro pwd /sysroot$1
 mount -t devtmpfs none /dev

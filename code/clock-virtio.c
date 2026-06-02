@@ -34,16 +34,16 @@ main(void) {
   virtio_gpu_dev_init(&dev, &pci);
 
   size_t size = 400 * 400 * 4;
-  char *buf = vfio_pci_dev_map_dma(&pci, align_up(size, 4096), NULL);
+  char *buf = vfio_pci_dev_map_dma(&pci, NULL, align_up(size, 4096), -1, 0);
 
-  virtio_gpu_resource_create_2d(&dev, 1, 400, 400);
-  virtio_gpu_resource_attach_backing(&dev, 1, buf, size);
-  virtio_gpu_set_scanout(&dev, 1, 400, 400);
+  uint32_t resource_id = virtio_gpu_resource_create_2d(&dev, 400, 400);
+  virtio_gpu_resource_attach_backing(&dev, resource_id, buf, size);
+  virtio_gpu_set_scanout(&dev, resource_id, 400, 400);
 
   cairo_surface_t *surface = cairo_image_surface_create_for_data(buf, CAIRO_FORMAT_ARGB32, 400, 400, 400 * 4);
   for (;;) {
     draw_clock(surface);
-    virtio_gpu_transfer_to_host_2d(&dev, 1, 400, 400);
-    virtio_gpu_resource_flush(&dev, 1, 400, 400);
+    virtio_gpu_transfer_to_host_2d(&dev, resource_id, 400, 400);
+    virtio_gpu_resource_flush(&dev, resource_id, 400, 400);
   }
 }
