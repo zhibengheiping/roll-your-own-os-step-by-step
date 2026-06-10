@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 
@@ -52,6 +53,32 @@ sendall(int fd, void *buf, size_t size) {
     size -= sent;
     p += sent;
   }
+}
+
+static
+void
+send_memfd(int fd, int memfd) {
+  char c = 0;
+  char control[CMSG_SPACE(sizeof(int))];
+
+  struct iovec iov = {
+    .iov_base = &c,
+    .iov_len = 1,
+  };
+
+  struct msghdr msg = {
+    .msg_iov = &iov,
+    .msg_iovlen = 1,
+    .msg_control = control,
+    .msg_controllen = sizeof(control),
+  };
+  struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
+  cmsg->cmsg_level = SOL_SOCKET;
+  cmsg->cmsg_type = SCM_RIGHTS;
+  cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+  *((int *) CMSG_DATA(cmsg)) = memfd;
+  assert(sendmsg(fd, &msg, MSG_WAITALL) == 1);
+  close(memfd);
 }
 
 static
@@ -235,27 +262,7 @@ vtest_client_run(struct virtio_gpu_dev *dev, int fd) {
         void *buf = vfio_pci_dev_map_dma(dev->virtio.pci, NULL, size, memfd, 0);
         virtio_gpu_resource_attach_backing(dev, resource_id, buf, size);
 
-        char c = 0;
-        char control[CMSG_SPACE(sizeof(int))];
-
-        struct iovec iov = {
-          .iov_base = &c,
-          .iov_len = 1,
-        };
-
-        struct msghdr msg = {
-          .msg_iov = &iov,
-          .msg_iovlen = 1,
-          .msg_control = control,
-          .msg_controllen = sizeof(control),
-        };
-        struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
-        cmsg->cmsg_level = SOL_SOCKET;
-        cmsg->cmsg_type = SCM_RIGHTS;
-        cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-        *((int *) CMSG_DATA(cmsg)) = memfd;
-        assert(sendmsg(fd, &msg, MSG_WAITALL) == 1);
-        close(memfd);
+        send_memfd(fd, memfd);
       }
 
       break;
@@ -307,7 +314,7 @@ main(void) {
   struct vfio_pci_dev pci = {0};
   char const *devid = getenv("DEVID");
   if (devid == NULL)
-    devid = "0000:00:04.0";
+    devid = "0000:00:05.0";
 
   vfio_pci_dev_open(devid, &pci);
   vfio_pci_dev_init(&pci);
@@ -324,6 +331,7 @@ main(void) {
   struct sockaddr_un addr = { .sun_family = AF_UNIX };
   strcpy(addr.sun_path, VTEST_DEFAULT_SOCKET_NAME);
   assert(bind(listen_fd, (struct sockaddr *)&addr, sizeof(addr)) == 0);
+  assert(chmod(VTEST_DEFAULT_SOCKET_NAME, 0777) == 0);
   assert(listen(listen_fd, 1) == 0);
 
   int client_fd = accept4(listen_fd, NULL, NULL, SOCK_CLOEXEC);

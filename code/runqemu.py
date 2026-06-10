@@ -14,6 +14,9 @@ def main(args):
     if args.quiet:
         kernel_args += ' quiet'
 
+    init_args = os.getcwd()
+    init_args += f' --user {os.getlogin()} --uid {os.getuid()}'
+
     assert kernel is not None
 
     pass_fds = ()
@@ -26,20 +29,17 @@ def main(args):
 
     qemu_args = (
         'qemu-system-x86_64',
+        '-d', 'guest_errors',
         '-machine', 'q35,accel=kvm,kernel-irqchip=split',
         '-m', str(args.m),
         '-device', 'intel-iommu,intremap=on',
         '-nographic', '-no-reboot', '-net', 'none',
         '-virtfs', 'local,path=/,mount_tag=rootfs,security_model=none,readonly=on',
-        '-virtfs', 'local,path=.,mount_tag=pwd,security_model=none,readonly=on',
         '-chardev', 'stdio,id=char0',
         '-mon', 'chardev=char0,mode=readline',
         '-add-fd', f'fd={master_fd},set=1,opaque=rdwr:monitor',
         '-chardev', f'serial,id=char1,path=/dev/fdset/1',
-        '-serial', 'chardev:char1',
-        '-kernel', kernel,
-        '-initrd', initrd,
-        '-append', kernel_args + ' -- ' + os.getcwd()
+        '-serial', 'chardev:char1'
     )
 
     if args.serial:
@@ -52,7 +52,7 @@ def main(args):
         qemu_args += (
             '-add-fd', f'fd={master_fd},set=2,opaque=rdwr:monitor',
             '-chardev', f'serial,id=char2,path=/dev/fdset/2',
-            '-device', 'virtio-serial-pci-non-transitional,id=virtio-serial0,iommu_platform=on,max_ports=1,vectors=5',
+            '-device', 'virtio-serial-pci-non-transitional,id=virtio-serial0,iommu_platform=on,max_ports=1,vectors=5,addr=0x3',
             '-device', 'virtconsole,chardev=char2,bus=virtio-serial0.0')
 
     if args.vga or args.gpu:
@@ -60,26 +60,34 @@ def main(args):
 
     if args.vga is True:
         display = True
-        qemu_args += ('-device', 'VGA')
+        qemu_args += ('-device', 'VGA,addr=0x4')
     elif args.vga:
         display = True
         xres, yres = args.vga.split('x', 1)
         xres = int(xres)
         yres = int(yres)
-        qemu_args += ('-device', f'VGA,xres={xres},yres={yres}')
+        qemu_args += ('-device', f'VGA,xres={xres},yres={yres},addr=0x4')
 
     if args.gpu is True:
         display = True
-        qemu_args += ('-device', f'virtio-gpu-gl-pci,disable-legacy=on,iommu_platform=on')
+        qemu_args += ('-device', f'virtio-gpu-gl-pci,disable-legacy=on,iommu_platform=on,addr=0x5')
     elif args.gpu:
         display = True
         xres, yres = args.gpu.split('x', 1)
         xres = int(xres)
         yres = int(yres)
-        qemu_args += ('-device', f'virtio-gpu-gl-pci,disable-legacy=on,iommu_platform=on,xres={xres},yres={yres}')
+        qemu_args += ('-device', f'virtio-gpu-gl-pci,disable-legacy=on,iommu_platform=on,xres={xres},yres={yres},addr=0x5')
 
     if args.edu:
-        qemu_args += ('-device', 'edu')
+        qemu_args += ('-device', 'edu,addr=0x6')
+
+    if args.weston:
+        init_args += f' --udevd --seatd --xdg-runtime-dir --weston'
+
+    qemu_args += (
+        '-kernel', kernel,
+        '-initrd', initrd,
+        '-append', kernel_args + ' -- ' + init_args)
 
     env = os.environ.copy()
     env['LANG'] = 'C.utf8'
@@ -99,6 +107,13 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', nargs='?', const=True)
     parser.add_argument('--edu', action='store_true')
     parser.add_argument('--serial', action='store_true')
+    parser.add_argument('--weston', action='store_true')
 
     args = parser.parse_args()
+    if args.weston:
+        if args.m < 256:
+            args.m = 256
+        if not args.vga:
+            args.vga = True
+
     main(args)

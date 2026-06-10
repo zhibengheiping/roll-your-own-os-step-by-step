@@ -55,7 +55,7 @@ int
 main(int argc, char **argv) {
   printf("********** OPEN EDU DEVICE **********\n");
   struct vfio_pci_dev dev = {0};
-  vfio_pci_dev_open(((argc==1)?"0000:00:04.0":argv[1]), &dev);
+  vfio_pci_dev_open(((argc==1)?"0000:00:06.0":argv[1]), &dev);
   vfio_pci_dev_init(&dev);
 
   printf("********** CHECK DEVICE VERSION **********\n");

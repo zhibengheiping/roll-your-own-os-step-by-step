@@ -71,15 +71,12 @@ mount -t proc none proc
 mkdir -p sys
 mount -t sysfs none sys
 mount -t cgroup2 none sys/fs/cgroup
+mkdir -p run
 mount -t tmpfs none run
-mkdir -p run/user/0
-export XDG_RUNTIME_DIR=/run/user/0
-mkdir -p run/udev
-mkdir -p run/systemd
-mkdir -p /sysroot$1
-mount -t 9p -o trans=virtio,version=9p2000.L,ro pwd /sysroot$1
+mkdir -p tmp
+mount -t tmpfs none tmp
 mount -t devtmpfs none /dev
-exec setsid cttyhack switch_root -c /dev/console /sysroot /bin/bash -c "trap 'poweroff -f' EXIT; cd $1; /bin/bash"
+exec setsid cttyhack switch_root -c /dev/console /sysroot /bin/bash -c 'trap "poweroff -f" EXIT; cd $1; shift; ./init.py $@' -- "$@"
 """)
 
         os.chmod(init_path, 0o555)

@@ -70,7 +70,7 @@ main(int argc, char **argv) {
   struct vfio_pci_dev pci = {0};
   char const *devid = getenv("DEVID");
   if (devid == NULL)
-    devid = "0000:00:04.0";
+    devid = "0000:00:03.0";
 
   vfio_pci_dev_open(devid, &pci);
   vfio_pci_dev_init(&pci);
