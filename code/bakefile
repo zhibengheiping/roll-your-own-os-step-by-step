@@ -31,6 +31,7 @@ TARGETS = {
     "clock-gbm": ["gl-draw-clock"],
     "edu": ["vfio"],
     "console-virtio": ["vfio", "virtio"],
+    "fuse-9p": ["vfio", "virtio"],
     "clock-virtio": ["draw-clock", "vfio", "virtio", "virtio-gpu"],
     "virgl-virtio": ["vfio", "virtio", "virtio-gpu"],
 }
@@ -44,6 +45,7 @@ PKGCONF = {
     "wayland-wayland": ["wayland-client", "wayland-server"],
     "clock-kms": ["cairo", "libdrm"],
     "clock-gbm": ["egl", "gbm", "gl", "libdrm"],
+    "fuse-9p": ["fuse3"],
     "clock-virtio": ["cairo"],
 }
 

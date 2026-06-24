@@ -38,7 +38,7 @@ def main(args):
         '-chardev', 'stdio,id=char0',
         '-mon', 'chardev=char0,mode=readline',
         '-add-fd', f'fd={master_fd},set=1,opaque=rdwr:monitor',
-        '-chardev', f'serial,id=char1,path=/dev/fdset/1',
+        '-chardev', 'serial,id=char1,path=/dev/fdset/1',
         '-serial', 'chardev:char1'
     )
 
@@ -51,7 +51,7 @@ def main(args):
 
         qemu_args += (
             '-add-fd', f'fd={master_fd},set=2,opaque=rdwr:monitor',
-            '-chardev', f'serial,id=char2,path=/dev/fdset/2',
+            '-chardev', 'serial,id=char2,path=/dev/fdset/2',
             '-device', 'virtio-serial-pci-non-transitional,id=virtio-serial0,iommu_platform=on,max_ports=1,vectors=5,addr=0x3',
             '-device', 'virtconsole,chardev=char2,bus=virtio-serial0.0')
 
@@ -84,6 +84,12 @@ def main(args):
     if args.weston:
         init_args += f' --udevd --seatd --xdg-runtime-dir --weston'
 
+    if args.fs:
+        qemu_args += (
+            '-fsdev', 'local,security_model=none,readonly=on,id=fsdev0,path=/',
+            '-device', 'virtio-9p-pci,fsdev=fsdev0,mount_tag=hostshare,disable-legacy=on,iommu_platform=on,addr=0x7'
+        )
+
     qemu_args += (
         '-kernel', kernel,
         '-initrd', initrd,
@@ -108,6 +114,7 @@ if __name__ == '__main__':
     parser.add_argument('--edu', action='store_true')
     parser.add_argument('--serial', action='store_true')
     parser.add_argument('--weston', action='store_true')
+    parser.add_argument('--fs', action='store_true')
 
     args = parser.parse_args()
     if args.weston:
