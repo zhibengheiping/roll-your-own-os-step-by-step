@@ -202,18 +202,26 @@ xdg_surface_on_get_top_level(struct wl_client *client, struct wl_resource *resou
 }
 
 static
+void
+xdg_surface_on_ack_confiigure(struct wl_client *client, struct wl_resource *resource, uint32_t serial) {
+  struct xdg_surface *backend_xdg_surface = wl_resource_get_user_data(resource);
+  xdg_surface_ack_configure(backend_xdg_surface, serial);
+}
+
+static
 struct xdg_surface_interface xdg_surface_impl = {
   .destroy = NULL,
   .get_toplevel = xdg_surface_on_get_top_level,
   .get_popup = NULL,
   .set_window_geometry = NULL,
-  .ack_configure = NULL,
+  .ack_configure = xdg_surface_on_ack_confiigure,
 };
 
 static
 void
-xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t serial) {
-  xdg_surface_ack_configure(xdg_surface, serial);
+xdg_surface_configure(void *data, struct xdg_surface *backend_xdg_surface, uint32_t serial) {
+  struct wl_resource *xdg_surface = data;
+  xdg_surface_send_configure(xdg_surface, serial);
 }
 
 static
@@ -228,10 +236,10 @@ xdg_wm_base_on_get_xdg_surface(struct wl_client *client, struct wl_resource *res
   struct wl_surface *backend_wl_surface = wl_resource_get_user_data(wl_surface);
   struct xdg_surface *backend_xdg_surface = xdg_wm_base_get_xdg_surface(backend_xdg_wm_base, backend_wl_surface);
 
-  assert(xdg_surface_add_listener(backend_xdg_surface, &xdg_surface_listener, NULL) == 0);
-
   struct wl_resource *xdg_surface = wl_resource_create(client, &xdg_surface_interface, 7, id);
   assert(xdg_surface != NULL);
+
+  assert(xdg_surface_add_listener(backend_xdg_surface, &xdg_surface_listener, xdg_surface) == 0);
   wl_resource_set_implementation(xdg_surface, &xdg_surface_impl, backend_xdg_surface, NULL);
 }
 
