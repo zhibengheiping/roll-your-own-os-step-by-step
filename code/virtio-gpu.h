@@ -76,10 +76,15 @@ struct virtio_gpu_resource {
   size_t size;
 };
 
+struct virtio_gpu_callbacks {
+  void (*write_fence)(void *cookie, uint32_t fence_id);
+};
+
 struct virtio_gpu_dev {
   struct virtio_pci_dev virtio;
+  void *cookie;
+  struct virtio_gpu_callbacks *callbacks;
   struct virtio_gpu_cmd *cmds;
-  uint32_t fence_id;
   struct virtio_gpu_capset_info capset_infos[6];
   uint32_t fence_submitted;
   uint32_t fence_completed;
@@ -94,7 +99,7 @@ struct virtio_gpu_dev {
 };
 
 void
-virtio_gpu_dev_init(struct virtio_gpu_dev *dev, struct vfio_pci_dev *pci);
+virtio_gpu_dev_init(struct virtio_gpu_dev *dev, struct vfio_pci_dev *pci, void *cookie, struct virtio_gpu_callbacks *callbacks);
 
 void
 virtio_gpu_poll(struct virtio_gpu_dev *dev);
@@ -111,7 +116,7 @@ virtio_gpu_resource_attach_backing(struct virtio_gpu_dev *dev, uint32_t resource
 void
 virtio_gpu_transfer_to_host_2d(struct virtio_gpu_dev *dev, uint32_t resource_id, uint32_t width, uint32_t height);
 
-void
+uint32_t
 virtio_gpu_resource_flush(struct virtio_gpu_dev *dev, uint32_t resource_id, uint32_t width, uint32_t height);
 
 void

@@ -12,6 +12,7 @@ parser.add_argument('--udevd', action='store_true')
 parser.add_argument('--seatd', action='store_true')
 parser.add_argument('--xdg-runtime-dir', action='store_true')
 parser.add_argument('--weston', action='store_true')
+parser.add_argument('--nested', action='store_true')
 
 args = parser.parse_args()
 
@@ -33,5 +34,8 @@ if args.xdg_runtime_dir:
 
 if args.weston:
     check_call(("setsid", "-f", "runuser", "-u", args.user, "weston"), env=env)
+
+# if args.nested:
+#     check_call((), env=env)
 
 os.execv("/usr/bin/bash", ("bash",))

@@ -28,6 +28,8 @@ virtio_gpu_recv(struct virtio_gpu_dev *dev) {
     if (flags & VIRTIO_GPU_FLAG_FENCE) {
       uint32_t fence_id = dev->cmds[elem->id].response.hdr.fence_id;
       dev->fence_completed = fence_id;
+      if ((dev->callbacks) && (dev->callbacks->write_fence))
+        dev->callbacks->write_fence(dev->cookie, fence_id);
     }
   }
 
@@ -234,7 +236,7 @@ virtio_gpu_resource_create_2d(struct virtio_gpu_dev *dev, uint32_t width, uint32
   };
 
   dev->cmds[id].request = request;
-  virtio_gpu_sendrecv(dev, id, iov, 2, 1);
+  virtio_gpu_send(dev, id, iov, 2, 1);
   return resource_id;
 }
 
@@ -271,7 +273,7 @@ virtio_gpu_resource_attach_backing(struct virtio_gpu_dev *dev, uint32_t resource
 
   dev->cmds[id].request.resource_attach_backing.cmd = cmd;
   dev->cmds[id].request.resource_attach_backing.entry = entry;
-  virtio_gpu_sendrecv(dev, id, iov, 2, 1);
+  virtio_gpu_send(dev, id, iov, 2, 1);
 }
 
 void
@@ -306,7 +308,7 @@ virtio_gpu_set_scanout(struct virtio_gpu_dev *dev, uint32_t resource_id, uint32_
   };
 
   dev->cmds[id].request = request;
-  virtio_gpu_sendrecv(dev, id, iov, 2, 1);
+  virtio_gpu_send(dev, id, iov, 2, 1);
 }
 
 void
@@ -342,10 +344,10 @@ virtio_gpu_transfer_to_host_2d(struct virtio_gpu_dev *dev, uint32_t resource_id,
   };
 
   dev->cmds[id].request = request;
-  virtio_gpu_sendrecv(dev, id, iov, 2, 1);
+  virtio_gpu_send(dev, id, iov, 2, 1);
 }
 
-void
+uint32_t
 virtio_gpu_resource_flush(struct virtio_gpu_dev *dev, uint32_t resource_id, uint32_t width, uint32_t height) {
   uint16_t id = virtio_gpu_alloc(dev, 2);
   struct iovec iov[] = {
@@ -355,8 +357,7 @@ virtio_gpu_resource_flush(struct virtio_gpu_dev *dev, uint32_t resource_id, uint
       .iov_len = sizeof(dev->cmds[id].response.hdr)},
   };
 
-  uint32_t fence_id = dev->fence_id;
-  ++(dev->fence_id);
+  uint32_t fence_id = ++(dev->fence_submitted);
 
   union virtio_gpu_request request = {
     .resource_flush = {
@@ -380,7 +381,8 @@ virtio_gpu_resource_flush(struct virtio_gpu_dev *dev, uint32_t resource_id, uint
   };
 
   dev->cmds[id].request = request;
-  virtio_gpu_sendrecv(dev, id, iov, 2, 1);
+  virtio_gpu_send(dev, id, iov, 2, 1);
+  return fence_id;
 }
 
 struct virtio_gpu_resp_capset_info
@@ -562,12 +564,6 @@ virtio_gpu_ctx_alloc(struct virtio_gpu_dev *dev) {
   return ctx_id + 1;
 }
 
-static
-uint32_t
-virtio_gpu_ctx_fence_alloc(struct virtio_gpu_dev *dev, uint32_t ctx_id) {
-  return ++(dev->fence_submitted);
-}
-
 uint32_t
 virtio_gpu_ctx_create(struct virtio_gpu_dev *dev, uint32_t nlen, char const *debug_name) {
   uint32_t ctx_id = virtio_gpu_ctx_alloc(dev);
@@ -634,7 +630,7 @@ virtio_gpu_ctx_attach_resource(struct virtio_gpu_dev *dev, uint32_t ctx_id, uint
 
 void
 virtio_gpu_submit_cmd(struct virtio_gpu_dev *dev, uint32_t ctx_id, size_t size, void *buf) {
-  uint32_t fence_id = virtio_gpu_ctx_fence_alloc(dev, ctx_id);
+  uint32_t fence_id = ++(dev->fence_submitted);
 
   uint16_t id = virtio_gpu_alloc(dev, 3);
   struct iovec iov[] = {
@@ -666,18 +662,19 @@ virtio_gpu_submit_cmd(struct virtio_gpu_dev *dev, uint32_t ctx_id, size_t size, 
 }
 
 
-
 void
-virtio_gpu_dev_init(struct virtio_gpu_dev *dev, struct vfio_pci_dev *pci) {
+virtio_gpu_dev_init(struct virtio_gpu_dev *dev, struct vfio_pci_dev *pci, void *cookie, struct virtio_gpu_callbacks *callbacks) {
   virtio_pci_dev_init(&dev->virtio, pci, (1 << VIRTIO_GPU_F_VIRGL));
-  /* virtio_pci_dev_init(&dev->virtio, pci, 0); */
+
+  dev->cookie = cookie;
+  dev->callbacks = callbacks;
+
   struct virtio_queue *queue = &dev->virtio.queues[0];
   size_t size = sizeof(struct virtio_gpu_cmd) * queue->vring.num;
 
   struct virtio_gpu_cmd *cmds = vfio_pci_dev_map_dma(pci, NULL, align_up(size, 4096), -1, 0);
 
   dev->cmds = cmds;
-  dev->fence_id = 0;
 
   virtio_send_driver_ok(&dev->virtio);
   struct virtio_gpu_config volatile *cfg = dev->virtio.device_cfg;

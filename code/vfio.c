@@ -486,8 +486,11 @@ vfio_pci_dev_open(const char *device, struct vfio_pci_dev *dev) {
   sysfs_pci_bind_driver(dirfd, device, "vfio-pci");
 
   char buf[100];
-  assert(readlinkat(dirfd, "iommu_group", buf, 100) > 0);
+  ssize_t len = readlinkat(dirfd, "iommu_group", buf, 100);
   close(dirfd);
+  assert(len > 0);
+  assert(len < 99);
+  buf[len] = 0;
 
   int container = vfio_get_container_fd();
   assert(ioctl(container, VFIO_CHECK_EXTENSION, VFIO_TYPE1_IOMMU));

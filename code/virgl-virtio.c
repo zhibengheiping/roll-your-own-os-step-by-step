@@ -320,7 +320,7 @@ main(void) {
   vfio_pci_dev_init(&pci);
 
   struct virtio_gpu_dev dev = {0};
-  virtio_gpu_dev_init(&dev, &pci);
+  virtio_gpu_dev_init(&dev, &pci, NULL, NULL);
 
 
   int listen_fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);

@@ -26,7 +26,7 @@ TARGETS = {
     "gl-draw-clock": [],
     "clock-egl": ["gl-draw-clock", "generated/xdg-shell-protocol"],
     "clock-dmabuf": ["gl-draw-clock", "generated/xdg-shell-protocol", "generated/linux-dmabuf-v1-protocol"],
-    "wayland-wayland": ["generated/xdg-shell-protocol", "generated/linux-dmabuf-v1-protocol"],
+    "wayland-wayland": ["generated/xdg-shell-protocol"],
     "clock-kms": ["draw-clock"],
     "clock-gbm": ["gl-draw-clock"],
     "edu": ["vfio"],
@@ -34,7 +34,8 @@ TARGETS = {
     "fuse-9p": ["vfio", "virtio"],
     "clock-virtio": ["draw-clock", "vfio", "virtio", "virtio-gpu"],
     "virgl-virtio": ["vfio", "virtio", "virtio-gpu"],
-    "nested-wayland": ["generated/xdg-shell-protocol", "generated/linux-dmabuf-v1-protocol"],
+    "nested-wayland": ["generated/xdg-shell-protocol"],
+    "wayland-virtio": ["vfio", "virtio", "virtio-gpu", "generated/xdg-shell-protocol"],
 }
 
 PKGCONF = {
@@ -49,6 +50,7 @@ PKGCONF = {
     "fuse-9p": ["fuse3"],
     "clock-virtio": ["cairo"],
     "nested-wayland": ["wayland-client", "wayland-server"],
+    "wayland-virtio": ["wayland-server"],
 }
 
 for name in set().union(TARGETS, *TARGETS.values()):

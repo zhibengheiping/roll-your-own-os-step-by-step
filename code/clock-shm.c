@@ -56,7 +56,6 @@ request_frame(struct frame_context *context) {
   struct wl_callback *cb = wl_surface_frame(context->wl_surface);
   wl_callback_add_listener(cb, &frame_callback_listener, context);
 
-  struct wl_callback *frame_cb = wl_surface_frame(context->wl_surface);
   draw_clock(context->cr_surface);
   wl_surface_attach(context->wl_surface, context->wl_buffer, 0, 0);
   wl_surface_damage_buffer(context->wl_surface, 0, 0, INT32_MAX, INT32_MAX);

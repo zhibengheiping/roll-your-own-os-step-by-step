@@ -203,7 +203,7 @@ xdg_surface_on_get_top_level(struct wl_client *client, struct wl_resource *resou
 
 static
 void
-xdg_surface_on_ack_confiigure(struct wl_client *client, struct wl_resource *resource, uint32_t serial) {
+xdg_surface_on_ack_configure(struct wl_client *client, struct wl_resource *resource, uint32_t serial) {
   struct xdg_surface *backend_xdg_surface = wl_resource_get_user_data(resource);
   xdg_surface_ack_configure(backend_xdg_surface, serial);
 }
@@ -214,7 +214,7 @@ struct xdg_surface_interface xdg_surface_impl = {
   .get_toplevel = xdg_surface_on_get_top_level,
   .get_popup = NULL,
   .set_window_geometry = NULL,
-  .ack_configure = xdg_surface_on_ack_confiigure,
+  .ack_configure = xdg_surface_on_ack_configure,
 };
 
 static

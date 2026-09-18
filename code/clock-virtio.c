@@ -1,8 +1,6 @@
 #include <assert.h>
 #include <stddef.h>
 #include <stdlib.h>
-
-#include <stdio.h>
 #include <unistd.h>
 
 #include "virtio-gpu.h"
@@ -31,7 +29,7 @@ main(void) {
   vfio_pci_dev_init(&pci);
 
   struct virtio_gpu_dev dev = {0};
-  virtio_gpu_dev_init(&dev, &pci);
+  virtio_gpu_dev_init(&dev, &pci, NULL, NULL);
 
   size_t size = 400 * 400 * 4;
   char *buf = vfio_pci_dev_map_dma(&pci, NULL, align_up(size, 4096), -1, 0);
@@ -45,5 +43,7 @@ main(void) {
     draw_clock(surface);
     virtio_gpu_transfer_to_host_2d(&dev, resource_id, 400, 400);
     virtio_gpu_resource_flush(&dev, resource_id, 400, 400);
+    while (dev.fence_submitted != dev.fence_completed)
+      virtio_gpu_poll(&dev);
   }
 }

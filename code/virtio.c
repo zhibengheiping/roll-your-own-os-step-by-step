@@ -141,10 +141,8 @@ virtio_pci_dev_init(struct virtio_pci_dev *dev, struct vfio_pci_dev *pci, uint64
 
     for (uint16_t j=0; j<queue_size; ++j) {
       queues[i].vring.desc[j].next = j+1;
-      queues[i].vring.desc[j].flags |= VRING_DESC_F_NEXT;
+      queues[i].vring.desc[j].flags = VRING_DESC_F_NEXT;
     }
-
-    queues[i].vring.desc[queue_size-1].flags ^= VRING_DESC_F_NEXT;
 
     queues[i].free_head = 0;
     queues[i].free_count = queue_size;
@@ -232,7 +230,7 @@ virtio_queue_send(struct virtio_queue *queue, uint16_t index) {
 
   // 7. The driver sends an available buffer notification to the device if such notifications are not suppressed.
   if (!(flags & VRING_USED_F_NO_NOTIFY))
-    *queue->notify_addr = queue->index;
+    *queue->notify_addr = (uint16_t)queue->index;
 }
 
 struct vring_used_elem *

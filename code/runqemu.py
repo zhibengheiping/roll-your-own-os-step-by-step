@@ -90,6 +90,9 @@ def main(args):
             '-device', 'virtio-9p-pci,fsdev=fsdev0,mount_tag=hostshare,disable-legacy=on,iommu_platform=on,addr=0x7'
         )
 
+    if args.nested:
+        init_args += ' --xdg-runtime-dir --nested'
+
     qemu_args += (
         '-kernel', kernel,
         '-initrd', initrd,
@@ -115,6 +118,7 @@ if __name__ == '__main__':
     parser.add_argument('--serial', action='store_true')
     parser.add_argument('--weston', action='store_true')
     parser.add_argument('--fs', action='store_true')
+    parser.add_argument('--nested', action='store_true')
 
     args = parser.parse_args()
     if args.weston:
@@ -122,5 +126,9 @@ if __name__ == '__main__':
             args.m = 256
         if not args.vga:
             args.vga = True
+
+    if args.nested:
+        if not args.gpu:
+            args.gpu = True
 
     main(args)
