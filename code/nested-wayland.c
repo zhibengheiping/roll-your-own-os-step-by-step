@@ -36,6 +36,7 @@ void
 wl_surface_on_destroy(struct wl_client *client, struct wl_resource *resource) {
   struct wl_surface *backend_wl_surface = wl_resource_get_user_data(resource);
   wl_surface_destroy(backend_wl_surface);
+  wl_resource_destroy(resource);
 }
 
 static
@@ -143,6 +144,7 @@ void
 wl_region_on_destroy(struct wl_client *client, struct wl_resource *resource) {
   struct wl_region *wl_region = wl_resource_get_user_data(resource);
   wl_region_destroy(wl_region);
+  wl_resource_destroy(resource);
 }
 
 static
@@ -189,6 +191,7 @@ void
 wl_buffer_on_destroy(struct wl_client *client, struct wl_resource *resource) {
   struct wl_buffer *wl_buffer = wl_resource_get_user_data(resource);
   wl_buffer_destroy(wl_buffer);
+  wl_resource_destroy(resource);
 }
 
 static
@@ -226,6 +229,7 @@ void
 wl_shm_pool_on_destroy(struct wl_client *client, struct wl_resource *resource) {
   struct wl_shm_pool *backend_wl_shm_pool = wl_resource_get_user_data(resource);
   wl_shm_pool_destroy(backend_wl_shm_pool);
+  wl_resource_destroy(resource);
 }
 
 static
@@ -274,6 +278,7 @@ void
 xdg_toplevel_on_destroy(struct wl_client *client, struct wl_resource *resource) {
   struct xdg_toplevel *backend_xdg_toplevel = wl_resource_get_user_data(resource);
   xdg_toplevel_destroy(backend_xdg_toplevel);
+  wl_resource_destroy(resource);
 }
 
 static
@@ -358,6 +363,7 @@ void
 xdg_surface_on_destroy(struct wl_client *client, struct wl_resource *resource) {
   struct xdg_surface *backend_xdg_surface = wl_resource_get_user_data(resource);
   xdg_surface_destroy(backend_xdg_surface);
+  wl_resource_destroy(resource);
 }
 
 static

@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <stdio.h>
-
 #include "virtio-gpu.h"
 
 static
@@ -273,6 +271,39 @@ virtio_gpu_resource_attach_backing(struct virtio_gpu_dev *dev, uint32_t resource
 
   dev->cmds[id].request.resource_attach_backing.cmd = cmd;
   dev->cmds[id].request.resource_attach_backing.entry = entry;
+  virtio_gpu_send(dev, id, iov, 2, 1);
+}
+
+
+void
+virtio_gpu_resource_detach_backing(struct virtio_gpu_dev *dev, uint32_t resource_id) {
+  dev->rscs[resource_id - 1].buf = NULL;
+  dev->rscs[resource_id - 1].size = 0;
+
+  uint16_t id = virtio_gpu_alloc(dev, 2);
+  struct iovec iov[] = {
+    { .iov_base = &dev->cmds[id].request.resource_detach_backing,
+      .iov_len = sizeof(dev->cmds[id].request.resource_detach_backing)},
+    { .iov_base = &dev->cmds[id].response.hdr,
+      .iov_len = sizeof(dev->cmds[id].response.hdr)},
+  };
+
+  union virtio_gpu_request request = {
+    .resource_detach_backing = {
+      .hdr = {
+        .type = VIRTIO_GPU_CMD_RESOURCE_DETACH_BACKING,
+        .flags = 0,
+        .fence_id = 0,
+        .ctx_id = 0,
+        .ring_idx = 0,
+        .padding = {0, 0, 0},
+      },
+      .resource_id = resource_id,
+      .padding = 0,
+    },
+  };
+
+  dev->cmds[id].request = request;
   virtio_gpu_send(dev, id, iov, 2, 1);
 }
 
@@ -673,7 +704,6 @@ virtio_gpu_dev_init(struct virtio_gpu_dev *dev, struct vfio_pci_dev *pci, void *
   size_t size = sizeof(struct virtio_gpu_cmd) * queue->vring.num;
 
   struct virtio_gpu_cmd *cmds = vfio_pci_dev_map_dma(pci, NULL, align_up(size, 4096), -1, 0);
-
   dev->cmds = cmds;
 
   virtio_send_driver_ok(&dev->virtio);

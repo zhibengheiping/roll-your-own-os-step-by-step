@@ -56,7 +56,8 @@ def main(args):
             '-device', 'virtconsole,chardev=char2,bus=virtio-serial0.0')
 
     if args.vga or args.gpu:
-        qemu_args += ('-display', 'gtk,gl=on,zoom-to-fit=off', '-vga', 'none')
+        # qemu_args += ('-display', 'gtk,gl=on,zoom-to-fit=off', '-vga', 'none')
+        qemu_args += ('-display', 'sdl,gl=on', '-vga', 'none')
 
     if args.vga is True:
         display = True
@@ -93,6 +94,12 @@ def main(args):
     if args.nested:
         init_args += ' --xdg-runtime-dir --nested'
 
+    if args.input:
+        qemu_args += (
+            '-device', 'virtio-keyboard-pci,disable-legacy=on,iommu_platform=on,addr=0x8,vectors=3',
+            '-device', 'virtio-tablet-pci,disable-legacy=on,iommu_platform=on,addr=0x9,vectors=3'
+        )
+
     qemu_args += (
         '-kernel', kernel,
         '-initrd', initrd,
@@ -119,6 +126,7 @@ if __name__ == '__main__':
     parser.add_argument('--weston', action='store_true')
     parser.add_argument('--fs', action='store_true')
     parser.add_argument('--nested', action='store_true')
+    parser.add_argument('--input', action='store_true')
 
     args = parser.parse_args()
     if args.weston:
@@ -128,7 +136,11 @@ if __name__ == '__main__':
             args.vga = True
 
     if args.nested:
+        if args.m < 256:
+            args.m = 256
         if not args.gpu:
             args.gpu = True
+        if not args.input:
+            args.input = True
 
     main(args)

@@ -35,7 +35,10 @@ if args.xdg_runtime_dir:
 if args.weston:
     check_call(("setsid", "-f", "runuser", "-u", args.user, "weston"), env=env)
 
-# if args.nested:
-#     check_call((), env=env)
+if args.nested:
+    check_call(("setsid", "-f", "./nested-virtio.elf"), env=env)
 
-os.execv("/usr/bin/bash", ("bash",))
+if args.nested:
+    os.execve("/usr/bin/runuser", ("runuser", "-u", args.user, "/usr/bin/bash"), env)
+else:
+    os.execv("/usr/bin/bash", ("bash",))

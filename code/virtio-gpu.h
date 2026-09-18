@@ -39,6 +39,7 @@ union virtio_gpu_request {
     struct virtio_gpu_resource_attach_backing cmd;
     struct virtio_gpu_mem_entry entry;
   } resource_attach_backing;
+  struct virtio_gpu_resource_detach_backing resource_detach_backing;
   struct virtio_gpu_resource_flush resource_flush;
   struct virtio_gpu_set_scanout set_scanout;
   struct virtio_gpu_get_capset_info get_capset_info;
@@ -104,6 +105,9 @@ virtio_gpu_dev_init(struct virtio_gpu_dev *dev, struct vfio_pci_dev *pci, void *
 void
 virtio_gpu_poll(struct virtio_gpu_dev *dev);
 
+struct virtio_gpu_resp_display_info
+virtio_gpu_get_display_info(struct virtio_gpu_dev *dev);
+
 uint32_t
 virtio_gpu_resource_create_2d(struct virtio_gpu_dev *dev, uint32_t width, uint32_t height);
 
@@ -112,6 +116,9 @@ virtio_gpu_resource_unref(struct virtio_gpu_dev *dev, uint32_t resource_id);
 
 void
 virtio_gpu_resource_attach_backing(struct virtio_gpu_dev *dev, uint32_t resource_id, void *buf, size_t size);
+
+void
+virtio_gpu_resource_detach_backing(struct virtio_gpu_dev *dev, uint32_t resource_id);
 
 void
 virtio_gpu_transfer_to_host_2d(struct virtio_gpu_dev *dev, uint32_t resource_id, uint32_t width, uint32_t height);
