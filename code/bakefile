@@ -37,6 +37,7 @@ TARGETS = {
     "nested-wayland": ["generated/xdg-shell-protocol"],
     "wayland-virtio": ["vfio", "virtio", "virtio-gpu", "generated/xdg-shell-protocol"],
     "nested-virtio": ["vfio", "virtio", "virtio-gpu", "generated/xdg-shell-protocol", "virtio-input"],
+    "virgl-nested-virtio": ["vfio", "virtio", "virtio-gpu", "generated/xdg-shell-protocol", "virtio-input"],
 }
 
 PKGCONF = {
@@ -53,6 +54,7 @@ PKGCONF = {
     "nested-wayland": ["wayland-client", "wayland-server"],
     "wayland-virtio": ["wayland-server"],
     "nested-virtio": ["wayland-server"],
+    "virgl-nested-virtio": ["wayland-server"],
 }
 
 for name in set().union(TARGETS, *TARGETS.values()):

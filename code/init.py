@@ -36,7 +36,7 @@ if args.weston:
     check_call(("setsid", "-f", "runuser", "-u", args.user, "weston"), env=env)
 
 if args.nested:
-    check_call(("setsid", "-f", "./nested-virtio.elf"), env=env)
+    check_call(("setsid", "-f", "./virgl-nested-virtio.elf"), env=env)
 
 if args.nested:
     os.execve("/usr/bin/runuser", ("runuser", "-u", args.user, "/usr/bin/bash"), env)
